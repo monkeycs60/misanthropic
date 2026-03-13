@@ -1,5 +1,6 @@
 use misanthropic::state::{Resources, GameState};
 use misanthropic::buildings::BuildingType;
+use misanthropic::research::ResearchId;
 
 #[test]
 fn test_resources_default() {
@@ -111,4 +112,86 @@ fn test_receive_tokens() {
     assert_eq!(gs.resources.data, 50);
     assert_eq!(gs.lifetime_tokens, 234_000);
     assert_eq!(gs.lifetime_tool_calls, 50);
+}
+
+// --- Research action tests ---
+
+#[test]
+fn test_start_research() {
+    let mut gs = GameState::new();
+    gs.resources.data = 200;
+    gs.resources.max_data = 200;
+    let result = gs.try_start_research(&ResearchId::Overclocking);
+    assert!(result.is_ok());
+    assert!(gs.active_research.is_some());
+    assert_eq!(gs.resources.data, 150); // 200 - 50
+}
+
+#[test]
+fn test_cannot_research_without_prereq() {
+    let mut gs = GameState::new();
+    gs.resources.data = 500;
+    gs.resources.max_data = 500;
+    let result = gs.try_start_research(&ResearchId::Multithreading);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("prerequisite"));
+}
+
+#[test]
+fn test_cannot_research_while_active() {
+    let mut gs = GameState::new();
+    gs.resources.data = 500;
+    gs.resources.max_data = 500;
+    gs.try_start_research(&ResearchId::Overclocking).unwrap();
+    let result = gs.try_start_research(&ResearchId::NetworkScanning);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("already"));
+}
+
+#[test]
+fn test_complete_research() {
+    use chrono::{Utc, Duration};
+    let mut gs = GameState::new();
+    gs.resources.data = 200;
+    gs.resources.max_data = 200;
+    gs.try_start_research(&ResearchId::Overclocking).unwrap();
+
+    // Force completion by setting started_at far in the past
+    if let Some(ref mut active) = gs.active_research {
+        active.started_at = Utc::now() - Duration::hours(2);
+    }
+
+    let completed = gs.check_research_completion();
+    assert_eq!(completed, Some(ResearchId::Overclocking));
+    assert!(gs.has_research(&ResearchId::Overclocking));
+    assert!(gs.active_research.is_none());
+}
+
+#[test]
+fn test_cannot_research_already_researched() {
+    use chrono::{Utc, Duration};
+    let mut gs = GameState::new();
+    gs.resources.data = 500;
+    gs.resources.max_data = 500;
+
+    // Research Overclocking
+    gs.try_start_research(&ResearchId::Overclocking).unwrap();
+    if let Some(ref mut active) = gs.active_research {
+        active.started_at = Utc::now() - Duration::hours(2);
+    }
+    gs.check_research_completion();
+
+    // Try to research it again
+    let result = gs.try_start_research(&ResearchId::Overclocking);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("already"));
+}
+
+#[test]
+fn test_cannot_research_insufficient_data() {
+    let mut gs = GameState::new();
+    gs.resources.data = 10; // not enough for 50
+    let result = gs.try_start_research(&ResearchId::Overclocking);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("data"));
 }

@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 
 use crate::buildings::{BuildingDef, BuildingType, BuildingCategory, BUILDING_DEFS};
 use crate::economy;
-use crate::research::ResearchId;
+use crate::research::{ResearchId, ResearchDef};
 use crate::prestige::ForkSpec;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -250,6 +250,73 @@ impl GameState {
         let hype_per_sec = self.total_hype_per_hour() / 3600.0;
         let gained = hype_per_sec * delta_secs;
         self.resources.add_hype(gained);
+    }
+
+    /// Try to start researching the given research. Validates prerequisites,
+    /// checks no other research is active, spends data cost, applies GPU Cluster
+    /// time reduction, and sets active_research.
+    pub fn try_start_research(&mut self, id: &ResearchId) -> Result<(), String> {
+        // Check no active research
+        if self.active_research.is_some() {
+            return Err("Research already in progress".to_string());
+        }
+
+        // Check not already researched
+        if self.has_research(id) {
+            return Err(format!("{:?} is already researched", id));
+        }
+
+        let def = ResearchDef::get(id);
+
+        // Check prerequisite
+        if let Some(ref prereq) = def.prerequisite {
+            if !self.has_research(prereq) {
+                return Err(format!(
+                    "Missing prerequisite: {:?} required for {:?}",
+                    prereq, id
+                ));
+            }
+        }
+
+        // Check and spend data cost
+        if !self.resources.try_spend_data(def.data_cost) {
+            return Err(format!(
+                "Not enough data: need {} but have {}",
+                def.data_cost, self.resources.data
+            ));
+        }
+
+        // Apply GPU Cluster time reduction
+        let gpu_cluster_level = self.building_level(&BuildingType::GpuCluster);
+        let duration = (def.duration_secs as f64
+            * economy::research_time_multiplier(gpu_cluster_level)) as u64;
+
+        self.active_research = Some(ActiveResearch {
+            research_id: id.clone(),
+            started_at: Utc::now(),
+            duration_secs: duration,
+        });
+
+        Ok(())
+    }
+
+    /// Check if active research has completed. If so, mark it as researched,
+    /// clear active_research, and return the completed ResearchId.
+    pub fn check_research_completion(&mut self) -> Option<ResearchId> {
+        let is_complete = self
+            .active_research
+            .as_ref()
+            .map(|ar| ar.is_complete())
+            .unwrap_or(false);
+
+        if is_complete {
+            let active = self.active_research.take().unwrap();
+            let id = active.research_id;
+            self.researched.insert(id.clone(), true);
+            Some(id)
+        } else {
+            None
+        }
     }
 
     /// Convert incoming tokens and tool calls into resources.
