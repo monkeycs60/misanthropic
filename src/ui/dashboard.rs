@@ -651,9 +651,9 @@ fn render_nav_bar(f: &mut Frame, app: &App, area: Rect) {
 
     // Line 1: Game navigation
     let nav_items: Vec<(&str, &str)> = if narrow {
-        vec![("B", "Build"), ("R", "Research"), ("C", "Combat"), ("L", "Rank"), ("Q", "Quit")]
+        vec![("B", "Build"), ("R", "Rsch"), ("M", "Mkt"), ("C", "War"), ("L", "Rank"), ("Q", "Quit")]
     } else {
-        vec![("B", "Build"), ("R", "Research"), ("C", "Combat"), ("L", "Leaderboard"), ("Q", "Quit")]
+        vec![("B", "Build"), ("R", "Research"), ("M", "Market"), ("C", "Combat"), ("L", "Leaderboard"), ("Q", "Quit")]
     };
 
     let mut nav_spans = Vec::new();

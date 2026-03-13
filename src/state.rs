@@ -120,6 +120,10 @@ pub struct GameState {
     pub streak_days: u32,
     #[serde(default = "default_true")]
     pub auto_focus: bool,
+    #[serde(default)]
+    pub data_bought: u32,   // total data units bought on market (for price scaling)
+    #[serde(default)]
+    pub hype_bought: u32,   // total hype units bought on market (for price scaling)
 }
 
 fn default_true() -> bool { true }
@@ -193,6 +197,8 @@ impl GameState {
             compute_multiplier: 1.0,
             streak_days: 0,
             auto_focus: true,
+            data_bought: 0,
+            hype_bought: 0,
         }
     }
 
@@ -395,6 +401,36 @@ impl GameState {
         self.lifetime_tokens += tokens;
         self.lifetime_tool_calls += tool_calls;
         self.lifetime_compute += compute;
+    }
+
+    /// Buy data with $. Returns (data_gained, dollars_spent) or error.
+    pub fn buy_data(&mut self, amount: u32) -> Result<(u32, u64), String> {
+        let cost = economy::trade_cost(1_000, self.data_bought, amount);
+        if self.resources.compute < cost {
+            return Err(format!("Need ${} but have ${}", cost, self.resources.compute));
+        }
+        if self.resources.data as u64 + amount as u64 > self.resources.max_data as u64 {
+            return Err("Data storage full".to_string());
+        }
+        self.resources.compute -= cost;
+        self.resources.data += amount as u64;
+        self.data_bought += amount;
+        Ok((amount, cost))
+    }
+
+    /// Buy hype with $. Returns (hype_gained, dollars_spent) or error.
+    pub fn buy_hype(&mut self, amount: u32) -> Result<(u32, u64), String> {
+        let cost = economy::trade_cost(5_000, self.hype_bought, amount);
+        if self.resources.compute < cost {
+            return Err(format!("Need ${} but have ${}", cost, self.resources.compute));
+        }
+        if self.resources.hype + amount as f64 > self.resources.max_hype {
+            return Err("Hype storage full".to_string());
+        }
+        self.resources.compute -= cost;
+        self.resources.hype += amount as f64;
+        self.hype_bought += amount;
+        Ok((amount, cost))
     }
 
     /// Check and advance the tutorial step based on game progress.

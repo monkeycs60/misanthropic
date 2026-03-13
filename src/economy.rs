@@ -59,3 +59,20 @@ pub fn research_time_multiplier(gpu_cluster_level: u8) -> f64 {
 pub fn datacenter_production_multiplier(datacenter_level: u8) -> f64 {
     1.0 + 0.15 * datacenter_level as f64
 }
+
+/// Market trade rates. Price increases 3% per unit already bought (supply/demand).
+/// Returns the $ cost to buy `amount` units of a resource, given `already_bought` prior units.
+pub fn trade_cost(base_price: u64, already_bought: u32, amount: u32) -> u64 {
+    let mut total = 0u64;
+    for i in 0..amount {
+        let n = already_bought + i;
+        let price = base_price as f64 * 1.03_f64.powi(n as i32);
+        total += price as u64;
+    }
+    total
+}
+
+/// Cost of the next single unit at current demand level.
+pub fn trade_unit_price(base_price: u64, already_bought: u32) -> u64 {
+    (base_price as f64 * 1.03_f64.powi(already_bought as i32)) as u64
+}

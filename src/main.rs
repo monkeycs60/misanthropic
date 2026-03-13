@@ -265,6 +265,7 @@ fn render(frame: &mut ratatui::Frame, app: &App) {
         Screen::PvE => ui::combat::render_pve(frame, app),
         Screen::PvP => ui::combat::render_pvp_placeholder(frame),
         Screen::Leaderboard => ui::leaderboard::render_leaderboard(frame, app),
+        Screen::Market => ui::market::render_market(frame, app),
     }
 
     // Notification popup overlay on all screens (except Boot)
@@ -367,6 +368,12 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
             KeyCode::Char('l') | KeyCode::Char('L') => {
                 app.screen = Screen::Leaderboard;
                 app.leaderboard_tab = 0;
+                KeyAction::Continue
+            }
+            KeyCode::Char('m') | KeyCode::Char('M') => {
+                app.screen = Screen::Market;
+                app.market_selected = 0;
+                app.market_amount_idx = 0;
                 KeyAction::Continue
             }
             _ => KeyAction::Continue,
@@ -560,6 +567,74 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
                     } else {
                         app.leaderboard_tab - 1
                     };
+                    KeyAction::Continue
+                }
+                _ => KeyAction::Continue,
+            }
+        }
+        Screen::Market => {
+            const AMOUNTS: [u32; 4] = [1, 5, 10, 25];
+            match code {
+                KeyCode::Esc => {
+                    app.screen = Screen::Dashboard;
+                    KeyAction::Continue
+                }
+                KeyCode::Char('q') | KeyCode::Char('Q') => KeyAction::Quit,
+                KeyCode::Up => {
+                    if app.market_selected > 0 {
+                        app.market_selected -= 1;
+                    }
+                    app.market_amount_idx = 0;
+                    KeyAction::Continue
+                }
+                KeyCode::Down => {
+                    if app.market_selected < 1 {
+                        app.market_selected += 1;
+                    }
+                    app.market_amount_idx = 0;
+                    KeyAction::Continue
+                }
+                KeyCode::Left => {
+                    if app.market_amount_idx > 0 {
+                        app.market_amount_idx -= 1;
+                    }
+                    KeyAction::Continue
+                }
+                KeyCode::Right => {
+                    if app.market_amount_idx < AMOUNTS.len() - 1 {
+                        app.market_amount_idx += 1;
+                    }
+                    KeyAction::Continue
+                }
+                KeyCode::Enter => {
+                    let amount = AMOUNTS[app.market_amount_idx];
+                    match app.market_selected {
+                        0 => {
+                            // Buy data
+                            match app.state.buy_data(amount) {
+                                Ok((gained, spent)) => {
+                                    app.set_status(format!(
+                                        "+{} Data for ${}",
+                                        gained, spent
+                                    ));
+                                }
+                                Err(e) => app.set_status(e),
+                            }
+                        }
+                        1 => {
+                            // Buy hype
+                            match app.state.buy_hype(amount) {
+                                Ok((gained, spent)) => {
+                                    app.set_status(format!(
+                                        "+{} Hype for ${}",
+                                        gained, spent
+                                    ));
+                                }
+                                Err(e) => app.set_status(e),
+                            }
+                        }
+                        _ => {}
+                    }
                     KeyAction::Continue
                 }
                 _ => KeyAction::Continue,

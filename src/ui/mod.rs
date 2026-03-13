@@ -4,6 +4,7 @@ pub mod combat;
 pub mod combat_menu;
 pub mod dashboard;
 pub mod leaderboard;
+pub mod market;
 pub mod research;
 
 use misanthropic::combat::PveBattleResult;
@@ -20,6 +21,7 @@ pub enum Screen {
     PvE,
     PvP,
     Leaderboard,
+    Market,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,6 +53,9 @@ pub struct App {
     pub combat_phase: CombatPhase,
     pub combat_menu_selected: usize,
     pub leaderboard_tab: u8,
+    // Market fields
+    pub market_selected: usize,     // 0=buy data, 1=buy hype
+    pub market_amount_idx: usize,   // index into [1, 5, 10, 25]
 }
 
 impl App {
@@ -81,6 +86,8 @@ impl App {
             combat_phase: CombatPhase::SectorSelect,
             combat_menu_selected: 0,
             leaderboard_tab: 0,
+            market_selected: 0,
+            market_amount_idx: 0,
         }
     }
 
