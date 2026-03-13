@@ -439,11 +439,11 @@ impl GameState {
     /// Return the current tutorial message, or None if the tutorial is complete.
     pub fn tutorial_message(&self) -> Option<&'static str> {
         match self.tutorial_step {
-            0 => Some("\u{25BA} Your host uses Claude Code. 100 tokens = 1\u{26A1}Compute. Tool calls = \u{1F4E1}Data. Press [B] \u{2192} build CPU Core!"),
-            1 => Some("\u{25BA} CPU online! Build a Ram Bank [B] to store \u{1F4E1}Data \u{2014} you'll need it for research."),
-            2 => Some("\u{25BA} Your host is coding \u{2014} \u{26A1}Compute and \u{1F4E1}Data flow in. Spread AI across the planet!"),
-            3 => Some("\u{25BA} Got Data! Press [R] \u{2192} research Social Engineering to unlock propaganda buildings."),
-            4 => Some("\u{25BA} Build a Bot Farm [B] for \u{1F525}Hype, then [C] \u{2192} Combat to conquer sectors!"),
+            0 => Some("\u{25BA} Tokens=\u{26A1}Compute, tools=\u{1F4E1}Data. Press [B] to build a CPU Core!"),
+            1 => Some("\u{25BA} CPU online! [B] Build a Ram Bank to store \u{1F4E1}Data for research."),
+            2 => Some("\u{25BA} Host is coding \u{2014} \u{26A1}and \u{1F4E1} flow in. Spread AI across the planet!"),
+            3 => Some("\u{25BA} Got Data! [R] Research Social Engineering to unlock propaganda."),
+            4 => Some("\u{25BA} [B] Build a Bot Farm for \u{1F525}Hype, then [C] Combat to conquer!"),
             _ => None,
         }
     }
