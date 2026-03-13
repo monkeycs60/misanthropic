@@ -16,11 +16,13 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 use signal_hook::consts::{SIGUSR1, SIGUSR2};
 
+use misanthropic::combat::{self, AttackType};
 use misanthropic::jsonl;
 use misanthropic::persistence;
-use misanthropic::state::GameState;
+use misanthropic::sectors::{conversion_for_layer, SectorDef, SectorId};
+use misanthropic::state::{GameState, SectorProgress};
 
-use ui::{App, Screen};
+use ui::{App, CombatPhase, Screen};
 
 const TICK_RATE: Duration = Duration::from_millis(33); // ~30 FPS
 const PID_FILE: &str = "/tmp/misanthropic.pid";
@@ -96,7 +98,7 @@ fn main() -> io::Result<()> {
 
     // Save before exit
     app.state.last_active = Utc::now();
-    let _ = persistence::save_game(&app.state, &save_path);
+    let _ = persistence::save_game(&app.state, &persistence::save_path());
 
     // Restore terminal
     disable_raw_mode()?;
@@ -227,7 +229,10 @@ fn render(frame: &mut ratatui::Frame, app: &App) {
         Screen::Dashboard => ui::dashboard::render_dashboard(frame, app),
         Screen::Buildings => ui::buildings::render_buildings(frame, app),
         Screen::Research => ui::research::render_research(frame, app),
-        Screen::Combat | Screen::Leaderboard => {
+        Screen::CombatMenu => ui::combat_menu::render_combat_menu(frame, app),
+        Screen::PvE => ui::combat::render_pve(frame, app),
+        Screen::PvP => ui::combat::render_pvp_placeholder(frame),
+        Screen::Leaderboard => {
             render_placeholder(frame, &app.screen);
         }
     }
@@ -240,9 +245,6 @@ fn render_placeholder(frame: &mut ratatui::Frame, screen: &Screen) {
     use ratatui::widgets::{Block, Borders, Paragraph};
 
     let title = match screen {
-        Screen::Buildings => "BUILDINGS",
-        Screen::Research => "RESEARCH",
-        Screen::Combat => "COMBAT",
         Screen::Leaderboard => "LEADERBOARD",
         _ => "",
     };
@@ -278,6 +280,16 @@ enum KeyAction {
     Continue,
 }
 
+/// Ordered sector IDs matching combat screen indexing.
+const SECTOR_ORDER: [SectorId; 6] = [
+    SectorId::SiliconValley,
+    SectorId::SocialMedia,
+    SectorId::Corporate,
+    SectorId::CreativeArts,
+    SectorId::Education,
+    SectorId::Government,
+];
+
 fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
     match app.screen {
         Screen::Boot => {
@@ -309,8 +321,8 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
                 KeyAction::Continue
             }
             KeyCode::Char('c') | KeyCode::Char('C') => {
-                app.screen = Screen::Combat;
-                app.selected_index = 0;
+                app.screen = Screen::CombatMenu;
+                app.combat_menu_selected = 0;
                 KeyAction::Continue
             }
             KeyCode::Char('l') | KeyCode::Char('L') => {
@@ -442,7 +454,57 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
                 _ => KeyAction::Continue,
             }
         }
-        Screen::Combat | Screen::Leaderboard => {
+        Screen::CombatMenu => {
+            match code {
+                KeyCode::Esc => {
+                    app.screen = Screen::Dashboard;
+                    KeyAction::Continue
+                }
+                KeyCode::Char('q') | KeyCode::Char('Q') => KeyAction::Quit,
+                KeyCode::Up => {
+                    if app.combat_menu_selected > 0 {
+                        app.combat_menu_selected -= 1;
+                    }
+                    KeyAction::Continue
+                }
+                KeyCode::Down => {
+                    if app.combat_menu_selected < 1 {
+                        app.combat_menu_selected += 1;
+                    }
+                    KeyAction::Continue
+                }
+                KeyCode::Enter => {
+                    match app.combat_menu_selected {
+                        0 => {
+                            // PvE
+                            app.screen = Screen::PvE;
+                            app.combat_phase = CombatPhase::SectorSelect;
+                            app.combat_sector = 0;
+                            app.combat_result = None;
+                        }
+                        1 => {
+                            // PvP
+                            app.screen = Screen::PvP;
+                        }
+                        _ => {}
+                    }
+                    KeyAction::Continue
+                }
+                _ => KeyAction::Continue,
+            }
+        }
+        Screen::PvE => handle_pve_key(app, code),
+        Screen::PvP => {
+            match code {
+                KeyCode::Esc => {
+                    app.screen = Screen::CombatMenu;
+                    KeyAction::Continue
+                }
+                KeyCode::Char('q') | KeyCode::Char('Q') => KeyAction::Quit,
+                _ => KeyAction::Continue,
+            }
+        }
+        Screen::Leaderboard => {
             match code {
                 KeyCode::Esc => {
                     app.screen = Screen::Dashboard;
@@ -452,6 +514,187 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
                 _ => KeyAction::Continue,
             }
         }
+    }
+}
+
+fn handle_pve_key(app: &mut App, code: KeyCode) -> KeyAction {
+    match app.combat_phase {
+        CombatPhase::SectorSelect => match code {
+            KeyCode::Esc => {
+                app.screen = Screen::CombatMenu;
+                KeyAction::Continue
+            }
+            KeyCode::Char('q') | KeyCode::Char('Q') => KeyAction::Quit,
+            KeyCode::Up => {
+                if app.combat_sector > 0 {
+                    app.combat_sector -= 1;
+                }
+                KeyAction::Continue
+            }
+            KeyCode::Down => {
+                if app.combat_sector < 5 {
+                    app.combat_sector += 1;
+                }
+                KeyAction::Continue
+            }
+            KeyCode::Enter => {
+                // Check sector is available
+                if !ui::combat::is_sector_available(app.combat_sector, app) {
+                    app.set_status("Sector not yet available".to_string());
+                    return KeyAction::Continue;
+                }
+
+                // Check sector isn't complete
+                let sector_id = &SECTOR_ORDER[app.combat_sector];
+                let def = SectorDef::get(sector_id);
+                let progress = app.state.sectors.get(sector_id);
+                let current_layer = progress.map(|s| s.current_layer).unwrap_or(0);
+                if current_layer >= def.total_layers {
+                    app.set_status("Sector fully converted!".to_string());
+                    return KeyAction::Continue;
+                }
+
+                // Enter loadout build
+                app.combat_phase = CombatPhase::LoadoutBuild;
+                app.combat_selected_attack = 0;
+                // Reset loadout
+                app.combat_loadout = vec![(0, 0), (1, 0), (2, 0), (3, 0), (4, 0)];
+                KeyAction::Continue
+            }
+            _ => KeyAction::Continue,
+        },
+        CombatPhase::LoadoutBuild => match code {
+            KeyCode::Esc => {
+                app.combat_phase = CombatPhase::SectorSelect;
+                KeyAction::Continue
+            }
+            KeyCode::Char('q') | KeyCode::Char('Q') => KeyAction::Quit,
+            KeyCode::Up => {
+                if app.combat_selected_attack > 0 {
+                    app.combat_selected_attack -= 1;
+                }
+                KeyAction::Continue
+            }
+            KeyCode::Down => {
+                if app.combat_selected_attack < 4 {
+                    app.combat_selected_attack += 1;
+                }
+                KeyAction::Continue
+            }
+            KeyCode::Right | KeyCode::Char('+') | KeyCode::Char('=') => {
+                // Add one unit of selected attack
+                let idx = app.combat_selected_attack;
+                if !ui::combat::is_attack_unlocked(idx, app) {
+                    app.set_status("Attack locked \u{2014} requires research".to_string());
+                    return KeyAction::Continue;
+                }
+
+                let atk = AttackType::ALL[idx];
+                let cost = atk.hype_cost();
+                let current_total = ui::combat::loadout_total_cost(app);
+                let budget = app.state.resources.hype;
+
+                if current_total + cost > budget {
+                    app.set_status("Not enough hype!".to_string());
+                    return KeyAction::Continue;
+                }
+
+                // Max 10 of any single attack type
+                if app.combat_loadout[idx].1 < 10 {
+                    app.combat_loadout[idx].1 += 1;
+                }
+                KeyAction::Continue
+            }
+            KeyCode::Left | KeyCode::Char('-') => {
+                // Remove one unit
+                let idx = app.combat_selected_attack;
+                if app.combat_loadout[idx].1 > 0 {
+                    app.combat_loadout[idx].1 -= 1;
+                }
+                KeyAction::Continue
+            }
+            KeyCode::Enter => {
+                // Launch battle
+                let attacks = ui::combat::build_attacks(app);
+                if attacks.is_empty() {
+                    app.set_status("Select at least one attack!".to_string());
+                    return KeyAction::Continue;
+                }
+
+                let total_cost = ui::combat::loadout_total_cost(app);
+
+                // Deduct hype cost
+                if !app.state.resources.try_spend_hype(total_cost) {
+                    app.set_status("Not enough hype!".to_string());
+                    return KeyAction::Continue;
+                }
+
+                // Get enemy
+                let sector_id = &SECTOR_ORDER[app.combat_sector];
+                let progress = app.state.sectors.get(sector_id).cloned();
+                let current_layer = progress.as_ref().map(|s| s.current_layer).unwrap_or(0);
+                let next_layer = current_layer + 1;
+                let def = SectorDef::get(sector_id);
+
+                let enemy = match ui::combat::enemy_for_sector_layer(sector_id, next_layer) {
+                    Some(e) => e,
+                    None => {
+                        // Fallback: use Junior Skeptic
+                        misanthropic::enemies::ENEMY_DEFS
+                            .get(&misanthropic::enemies::EnemyId::JuniorSkeptic)
+                            .unwrap()
+                    }
+                };
+
+                // Resolve battle
+                let result = combat::resolve_pve_battle(&attacks, enemy);
+
+                // Apply results
+                if result.enemy_defeated {
+                    // Advance sector layer
+                    let new_layer = current_layer + 1;
+                    let conv = conversion_for_layer(new_layer, def.total_layers);
+                    let existing = app
+                        .state
+                        .sectors
+                        .entry(sector_id.clone())
+                        .or_insert(SectorProgress {
+                            current_layer: 0,
+                            max_layers: def.total_layers,
+                            conversion_pct: 0.0,
+                        });
+                    existing.current_layer = new_layer;
+                    existing.conversion_pct = (existing.conversion_pct + conv).min(100.0);
+
+                    // Award loot
+                    let loot_hype = (enemy.hp as f64 * 0.15).round();
+                    let loot_compute = (enemy.hp as f64 * 0.35).round() as u64;
+                    let loot_data = (enemy.hp as f64 * 0.05).round() as u64;
+                    app.state.resources.add_hype(loot_hype);
+                    app.state.resources.add_compute(loot_compute);
+                    app.state.resources.add_data(loot_data);
+                }
+
+                app.combat_result = Some(result);
+                app.combat_phase = CombatPhase::BattleResult;
+                KeyAction::Continue
+            }
+            _ => KeyAction::Continue,
+        },
+        CombatPhase::BattleResult => match code {
+            KeyCode::Esc => {
+                app.combat_phase = CombatPhase::SectorSelect;
+                app.combat_result = None;
+                KeyAction::Continue
+            }
+            KeyCode::Char('q') | KeyCode::Char('Q') => KeyAction::Quit,
+            KeyCode::Enter => {
+                app.combat_phase = CombatPhase::SectorSelect;
+                app.combat_result = None;
+                KeyAction::Continue
+            }
+            _ => KeyAction::Continue,
+        },
     }
 }
 

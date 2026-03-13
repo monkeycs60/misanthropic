@@ -1,8 +1,11 @@
 pub mod boot;
 pub mod buildings;
+pub mod combat;
+pub mod combat_menu;
 pub mod dashboard;
 pub mod research;
 
+use misanthropic::combat::PveBattleResult;
 use misanthropic::state::GameState;
 use std::time::Instant;
 
@@ -12,8 +15,17 @@ pub enum Screen {
     Dashboard,
     Buildings,
     Research,
-    Combat,
+    CombatMenu,
+    PvE,
+    PvP,
     Leaderboard,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CombatPhase {
+    SectorSelect,
+    LoadoutBuild,
+    BattleResult,
 }
 
 pub struct App {
@@ -30,6 +42,13 @@ pub struct App {
     pub building_selected: usize,
     pub research_selected_branch: u8,
     pub research_selected_level: u8,
+    // Combat fields
+    pub combat_sector: usize,
+    pub combat_loadout: Vec<(usize, u8)>,
+    pub combat_selected_attack: usize,
+    pub combat_result: Option<PveBattleResult>,
+    pub combat_phase: CombatPhase,
+    pub combat_menu_selected: usize,
 }
 
 impl App {
@@ -53,6 +72,12 @@ impl App {
             building_selected: 0,
             research_selected_branch: 0,
             research_selected_level: 0,
+            combat_sector: 0,
+            combat_loadout: vec![(0, 0), (1, 0), (2, 0), (3, 0), (4, 0)],
+            combat_selected_attack: 0,
+            combat_result: None,
+            combat_phase: CombatPhase::SectorSelect,
+            combat_menu_selected: 0,
         }
     }
 
