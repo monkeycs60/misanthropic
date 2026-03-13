@@ -211,6 +211,9 @@ fn run_loop(
             app.set_status(format!("Research complete: {}!", def.name));
         }
 
+        // Advance tutorial based on current game state
+        app.state.check_tutorial_advancement();
+
         // Auto-save every 60s
         if last_save.elapsed() >= AUTO_SAVE_INTERVAL {
             app.state.last_active = Utc::now();

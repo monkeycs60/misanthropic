@@ -16,32 +16,54 @@ const NOTIFICATION_DURATION: Duration = Duration::from_secs(3);
 pub fn render_dashboard(f: &mut Frame, app: &App) {
     let area = f.area();
 
-    // Main vertical layout
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),  // Title + dominance gauge
-            Constraint::Length(4),  // Resources
-            Constraint::Min(8),    // Neuron map
-            Constraint::Length(3), // Active research
-            Constraint::Length(2),  // Help line
-        ])
-        .split(area);
+    let show_tutorial = app.state.tutorial_step < 4;
+
+    // Main vertical layout — include tutorial row when active
+    let chunks = if show_tutorial {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),  // Title + dominance gauge
+                Constraint::Length(3),  // Tutorial callout
+                Constraint::Length(4),  // Resources
+                Constraint::Min(8),    // Neuron map
+                Constraint::Length(3), // Active research
+                Constraint::Length(2),  // Help line
+            ])
+            .split(area)
+    } else {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),  // Title + dominance gauge
+                Constraint::Length(0),  // Tutorial (hidden)
+                Constraint::Length(4),  // Resources
+                Constraint::Min(8),    // Neuron map
+                Constraint::Length(3), // Active research
+                Constraint::Length(2),  // Help line
+            ])
+            .split(area)
+    };
 
     // === Title + Dominance Gauge ===
     render_dominance(f, app, chunks[0]);
 
+    // === Tutorial Callout ===
+    if show_tutorial {
+        render_tutorial(f, app, chunks[1]);
+    }
+
     // === Resources ===
-    render_resources(f, app, chunks[1]);
+    render_resources(f, app, chunks[2]);
 
     // === Neuron Map ===
-    render_neuron_map(f, app, chunks[2]);
+    render_neuron_map(f, app, chunks[3]);
 
     // === Active Research ===
-    render_research(f, app, chunks[3]);
+    render_research(f, app, chunks[4]);
 
     // === Help Line ===
-    render_help(f, chunks[4]);
+    render_help(f, chunks[5]);
 
     // === Notification popup (if any) ===
     if let Some((ref msg, ref when)) = app.notification {
@@ -73,6 +95,25 @@ fn render_dominance(f: &mut Frame, app: &App, area: Rect) {
         )
         .ratio(dominance / 100.0);
     f.render_widget(gauge, area);
+}
+
+fn render_tutorial(f: &mut Frame, app: &App, area: Rect) {
+    if let Some(msg) = app.state.tutorial_message() {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow))
+            .title(" TUTORIAL ")
+            .title_alignment(Alignment::Center);
+
+        let paragraph = Paragraph::new(Line::from(Span::styled(
+            format!(" {}", msg),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .block(block);
+        f.render_widget(paragraph, area);
+    }
 }
 
 fn render_resources(f: &mut Frame, app: &App, area: Rect) {

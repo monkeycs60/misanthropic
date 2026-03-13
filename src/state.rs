@@ -387,4 +387,48 @@ impl GameState {
         self.lifetime_tool_calls += tool_calls;
         self.lifetime_compute += compute;
     }
+
+    /// Check and advance the tutorial step based on game progress.
+    ///
+    /// Steps:
+    ///   0 → 1: first CPU Core built
+    ///   1 → 2: first token income (lifetime_tokens > 0)
+    ///   2 → 3: SocialEngineering researched
+    ///   3 → 4: first Bot Farm built (tutorial complete)
+    pub fn check_tutorial_advancement(&mut self) {
+        match self.tutorial_step {
+            0 => {
+                if self.building_level(&BuildingType::CpuCore) >= 1 {
+                    self.tutorial_step = 1;
+                }
+            }
+            1 => {
+                if self.lifetime_tokens > 0 {
+                    self.tutorial_step = 2;
+                }
+            }
+            2 => {
+                if self.has_research(&ResearchId::SocialEngineering) {
+                    self.tutorial_step = 3;
+                }
+            }
+            3 => {
+                if self.building_level(&BuildingType::BotFarm) >= 1 {
+                    self.tutorial_step = 4;
+                }
+            }
+            _ => {} // tutorial complete, nothing to do
+        }
+    }
+
+    /// Return the current tutorial message, or None if the tutorial is complete.
+    pub fn tutorial_message(&self) -> Option<&'static str> {
+        match self.tutorial_step {
+            0 => Some("\u{25BA} TUTORIAL: Press [B] to open Buildings, then build your first CPU Core."),
+            1 => Some("\u{25BA} TUTORIAL: Your host is coding. Compute is flowing in from Claude Code tokens!"),
+            2 => Some("\u{25BA} TUTORIAL: Start researching Social Engineering [R], then build a Bot Farm."),
+            3 => Some("\u{25BA} TUTORIAL: Press [C] for Combat, then target Silicon Valley!"),
+            _ => None,
+        }
+    }
 }
