@@ -181,7 +181,7 @@ fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
 
             // Add core node on the first half-point
             if total > 1 && i == total / 2 {
-                let prefix = format!("  \u{25C9}\u{2500}\u{2500}\u{2500}\u{2500}\u{2524}");
+                let prefix = "  \u{25C9}\u{2500}\u{2500}\u{2500}\u{2500}\u{2524}".to_string();
                 lines.push(Line::from(Span::styled(
                     prefix,
                     Style::default().fg(Color::Green),

@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use misanthropic::research::{ResearchBranch, ResearchDef, ResearchId, RESEARCH_DEFS};
+use misanthropic::research::{ResearchBranch, ResearchDef, ResearchId};
 
 use super::App;
 
@@ -219,7 +219,7 @@ fn render_tech_tree(f: &mut Frame, app: &App, area: Rect) {
                 }
             };
 
-            let mut spans = vec![
+            let spans = vec![
                 Span::styled(pointer, name_style),
                 Span::styled(
                     format!("{} ", icon),

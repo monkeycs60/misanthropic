@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use misanthropic::buildings::{BuildingCategory, BuildingDef, BuildingType, BUILDING_DEFS};
+use misanthropic::buildings::{BuildingCategory, BuildingDef, BuildingType};
 use misanthropic::research::ResearchDef;
 
 use super::App;

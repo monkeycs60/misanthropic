@@ -148,6 +148,12 @@ pub struct SectorProgress {
     pub conversion_pct: f64,
 }
 
+impl Default for GameState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GameState {
     pub fn new() -> Self {
         let now = Utc::now();

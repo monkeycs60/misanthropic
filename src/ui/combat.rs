@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use misanthropic::combat::{AttackInstance, AttackType, PveBattleResult};
+use misanthropic::combat::{AttackInstance, AttackType};
 use misanthropic::enemies::{self, EnemyDef};
 use misanthropic::research::ResearchId;
 use misanthropic::sectors::{SectorDef, SectorId};
@@ -28,12 +28,7 @@ const SECTOR_ORDER: [SectorId; 6] = [
 pub fn is_sector_available(sector_idx: usize, app: &App) -> bool {
     match sector_idx {
         0 => true, // Silicon Valley always available
-        1 => {
-            // Social Media: available after SV layer 3+
-            let sv = app.state.sectors.get(&SectorId::SiliconValley);
-            sv.map(|s| s.current_layer >= 3).unwrap_or(false) || true
-            // Simplification per spec: first 2 always available
-        }
+        1 => true, // Social Media: always available (first 2 sectors)
         2 => {
             // Corporate: after SM layer 5+
             let sm = app.state.sectors.get(&SectorId::SocialMedia);
@@ -51,8 +46,7 @@ pub fn is_sector_available(sector_idx: usize, app: &App) -> bool {
         }
         5 => {
             // Government: needs 80%+ on all other sectors
-            for i in 0..5 {
-                let id = &SECTOR_ORDER[i];
+            for id in SECTOR_ORDER.iter().take(5) {
                 let progress = app.state.sectors.get(id);
                 match progress {
                     Some(s) if s.conversion_pct >= 80.0 => {}
@@ -78,7 +72,7 @@ pub fn is_attack_unlocked(attack_idx: usize, app: &App) -> bool {
 }
 
 /// Get the enemy for the next layer of the given sector.
-pub fn enemy_for_sector_layer(sector_id: &SectorId, layer: u8) -> Option<&'static EnemyDef> {
+pub fn enemy_for_sector_layer(_sector_id: &SectorId, layer: u8) -> Option<&'static EnemyDef> {
     let candidates = enemies::enemies_for_layer(layer);
     if candidates.is_empty() {
         return None;
@@ -879,7 +873,7 @@ fn render_battle_result(f: &mut Frame, app: &App) {
 }
 
 /// Pick a flavor text for PvE battle results.
-fn pick_pve_flavor(enemy: &EnemyDef, victory: bool) -> &'static str {
+fn pick_pve_flavor(_enemy: &EnemyDef, victory: bool) -> &'static str {
     use rand::Rng;
 
     let victory_flavors = [
