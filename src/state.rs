@@ -124,6 +124,8 @@ pub struct GameState {
     pub data_bought: u32,   // total data units bought on market (for price scaling)
     #[serde(default)]
     pub hype_bought: u32,   // total hype units bought on market (for price scaling)
+    #[serde(default)]
+    pub funding_rounds: u32, // number of market resets (Seed, Series A, B, ...)
 }
 
 fn default_true() -> bool { true }
@@ -199,6 +201,7 @@ impl GameState {
             auto_focus: true,
             data_bought: 0,
             hype_bought: 0,
+            funding_rounds: 0,
         }
     }
 
@@ -431,6 +434,19 @@ impl GameState {
         self.resources.hype += amount as f64;
         self.hype_bought += amount;
         Ok((amount, cost))
+    }
+
+    /// Raise a new funding round: reset market prices, costs $ that scales per round.
+    pub fn raise_funding_round(&mut self) -> Result<u32, String> {
+        let cost = economy::funding_round_cost(self.funding_rounds);
+        if self.resources.compute < cost {
+            return Err(format!("Need ${} but have ${}", cost, self.resources.compute));
+        }
+        self.resources.compute -= cost;
+        self.data_bought = 0;
+        self.hype_bought = 0;
+        self.funding_rounds += 1;
+        Ok(self.funding_rounds)
     }
 
     /// Check and advance the tutorial step based on game progress.

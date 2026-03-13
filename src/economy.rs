@@ -76,3 +76,9 @@ pub fn trade_cost(base_price: u64, already_bought: u32, amount: u32) -> u64 {
 pub fn trade_unit_price(base_price: u64, already_bought: u32) -> u64 {
     (base_price as f64 * 1.03_f64.powi(already_bought as i32)) as u64
 }
+
+/// Cost to raise a new funding round (market price reset).
+/// Base $500K, doubles each round: 500K, 1M, 2M, 4M, 8M, ...
+pub fn funding_round_cost(rounds_completed: u32) -> u64 {
+    500_000u64 * 2u64.pow(rounds_completed)
+}

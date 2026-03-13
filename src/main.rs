@@ -588,29 +588,28 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
                     KeyAction::Continue
                 }
                 KeyCode::Down => {
-                    if app.market_selected < 1 {
+                    if app.market_selected < ui::market::MARKET_ROWS - 1 {
                         app.market_selected += 1;
                     }
                     app.market_amount_idx = 0;
                     KeyAction::Continue
                 }
                 KeyCode::Left => {
-                    if app.market_amount_idx > 0 {
+                    if app.market_selected < 2 && app.market_amount_idx > 0 {
                         app.market_amount_idx -= 1;
                     }
                     KeyAction::Continue
                 }
                 KeyCode::Right => {
-                    if app.market_amount_idx < AMOUNTS.len() - 1 {
+                    if app.market_selected < 2 && app.market_amount_idx < AMOUNTS.len() - 1 {
                         app.market_amount_idx += 1;
                     }
                     KeyAction::Continue
                 }
                 KeyCode::Enter => {
-                    let amount = AMOUNTS[app.market_amount_idx];
                     match app.market_selected {
                         0 => {
-                            // Buy data
+                            let amount = AMOUNTS[app.market_amount_idx];
                             match app.state.buy_data(amount) {
                                 Ok((gained, spent)) => {
                                     app.set_status(format!(
@@ -622,12 +621,30 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
                             }
                         }
                         1 => {
-                            // Buy hype
+                            let amount = AMOUNTS[app.market_amount_idx];
                             match app.state.buy_hype(amount) {
                                 Ok((gained, spent)) => {
                                     app.set_status(format!(
                                         "+{} Hype for ${}",
                                         gained, spent
+                                    ));
+                                }
+                                Err(e) => app.set_status(e),
+                            }
+                        }
+                        2 => {
+                            // Funding round
+                            match app.state.raise_funding_round() {
+                                Ok(round) => {
+                                    let label = if round == 1 {
+                                        "Series A".to_string()
+                                    } else {
+                                        let letter = (b'A' + (round - 1).min(25) as u8) as char;
+                                        format!("Series {}", letter)
+                                    };
+                                    app.set_status(format!(
+                                        "{} raised! Market prices reset.",
+                                        label
                                     ));
                                 }
                                 Err(e) => app.set_status(e),
