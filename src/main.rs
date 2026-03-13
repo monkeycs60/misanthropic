@@ -17,6 +17,7 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 use signal_hook::consts::{SIGUSR1, SIGUSR2};
 
+use misanthropic::api::ApiClient;
 use misanthropic::combat::{self, AttackType};
 use misanthropic::jsonl;
 use misanthropic::persistence;
@@ -30,6 +31,7 @@ const PID_FILE: &str = "/tmp/misanthropic.pid";
 const JSONL_POLL_INTERVAL: Duration = Duration::from_secs(5);
 const AUTO_SAVE_INTERVAL: Duration = Duration::from_secs(60);
 const STATUS_MSG_DURATION: Duration = Duration::from_secs(3);
+const API_BASE_URL: &str = "https://misanthropic-api.clement-serizay.workers.dev";
 
 struct TokenUpdate {
     new_tokens: u64,
@@ -73,6 +75,11 @@ fn main() -> io::Result<()> {
     // Initial save (creates directory if needed)
     let _ = persistence::save_game(&state, &save_path);
 
+    // Register with backend
+    let api = ApiClient::new(API_BASE_URL);
+    let player_name = state.player_name.clone().unwrap_or_else(|| "Anonymous".to_string());
+    let _ = api.register(&state.player_id, &player_name);
+
     // 2. Write PID file
     fs::write(PID_FILE, process::id().to_string())?;
 
@@ -101,7 +108,7 @@ fn main() -> io::Result<()> {
 
     // 6. Run main loop
     let mut app = App::new(state);
-    let result = run_loop(&mut terminal, &mut app, &sigusr1, &sigusr2, &rx);
+    let result = run_loop(&mut terminal, &mut app, &sigusr1, &sigusr2, &rx, &api);
 
     // 7. Cleanup
     watcher_running.store(false, Ordering::Relaxed);
@@ -129,6 +136,7 @@ fn run_loop(
     sigusr1: &AtomicBool,
     sigusr2: &AtomicBool,
     rx: &mpsc::Receiver<TokenUpdate>,
+    api: &ApiClient,
 ) -> io::Result<()> {
     let mut last_tick = Instant::now();
     let mut last_save = Instant::now();
@@ -225,10 +233,11 @@ fn run_loop(
         // Advance tutorial based on current game state
         app.state.check_tutorial_advancement();
 
-        // Auto-save every 60s
+        // Auto-save every 60s + sync to backend
         if last_save.elapsed() >= AUTO_SAVE_INTERVAL {
             app.state.last_active = Utc::now();
             let _ = persistence::save_game(&app.state, &persistence::save_path());
+            let _ = api.sync(&app.state);
             last_save = Instant::now();
         }
 

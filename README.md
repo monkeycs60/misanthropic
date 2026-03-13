@@ -102,9 +102,11 @@ The game runs in a tmux split alongside Claude Code. Two features keep you in fl
 - **[S] Switch** — manually jump between the game and Claude Code at any time. Works from any screen.
 - **[F] Auto-switch** (on by default) — when your host submits a prompt, the game pane auto-focuses so you can play while Claude works. When Claude finishes, it switches back to the code pane. Toggle off with **F** if you find it distracting.
 
-### Save
+### Save & Cloud Sync
 
 Game progress is saved locally to `~/.misanthropic/save.json` (auto-save every 60s + on quit). The save format is forward-compatible — new game updates won't reset your progress.
+
+On every auto-save, your stats are synced to the cloud backend at `https://misanthropic-api.clement-serizay.workers.dev`. This powers the global leaderboard and PvP matchmaking. Since Claude Code requires internet anyway, cloud sync is always available.
 
 ## Architecture
 
@@ -132,9 +134,10 @@ src/
     combat.rs       # PvE battle flow
     combat_menu.rs  # PvE/PvP selection
     leaderboard.rs  # 6-tab leaderboard
-backend/            # Cloudflare Workers + D1
-  src/index.ts      # Hono API
-  wrangler.toml
+backend/            # Cloudflare Workers + D1 (deployed)
+  src/index.ts      # Hono API (register, sync, leaderboard, battle)
+  wrangler.toml     # D1 database binding
+  migrations/       # SQL schema (players, battles, attack_log)
 ```
 
 ## Tech Stack
