@@ -1,0 +1,11 @@
+pub mod economy;
+pub mod buildings;
+pub mod research;
+pub mod combat;
+pub mod sectors;
+pub mod enemies;
+pub mod prestige;
+pub mod flavor;
+pub mod jsonl;
+pub mod persistence;
+pub mod state;
