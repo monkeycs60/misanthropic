@@ -226,7 +226,8 @@ fn render(frame: &mut ratatui::Frame, app: &App) {
         Screen::Boot => ui::boot::render_boot(frame, app),
         Screen::Dashboard => ui::dashboard::render_dashboard(frame, app),
         Screen::Buildings => ui::buildings::render_buildings(frame, app),
-        Screen::Research | Screen::Combat | Screen::Leaderboard => {
+        Screen::Research => ui::research::render_research(frame, app),
+        Screen::Combat | Screen::Leaderboard => {
             render_placeholder(frame, &app.screen);
         }
     }
@@ -303,6 +304,8 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
             KeyCode::Char('r') | KeyCode::Char('R') => {
                 app.screen = Screen::Research;
                 app.selected_index = 0;
+                app.research_selected_branch = 0;
+                app.research_selected_level = 0;
                 KeyAction::Continue
             }
             KeyCode::Char('c') | KeyCode::Char('C') => {
@@ -380,7 +383,66 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
                 _ => KeyAction::Continue,
             }
         }
-        Screen::Research | Screen::Combat | Screen::Leaderboard => {
+        Screen::Research => {
+            match code {
+                KeyCode::Esc => {
+                    app.screen = Screen::Dashboard;
+                    KeyAction::Continue
+                }
+                KeyCode::Char('q') | KeyCode::Char('Q') => KeyAction::Quit,
+                KeyCode::Left => {
+                    if app.research_selected_branch > 0 {
+                        app.research_selected_branch -= 1;
+                    }
+                    // Clamp level to valid range (always 0..4)
+                    if app.research_selected_level > 4 {
+                        app.research_selected_level = 4;
+                    }
+                    KeyAction::Continue
+                }
+                KeyCode::Right => {
+                    if app.research_selected_branch < 2 {
+                        app.research_selected_branch += 1;
+                    }
+                    if app.research_selected_level > 4 {
+                        app.research_selected_level = 4;
+                    }
+                    KeyAction::Continue
+                }
+                KeyCode::Up => {
+                    if app.research_selected_level > 0 {
+                        app.research_selected_level -= 1;
+                    }
+                    KeyAction::Continue
+                }
+                KeyCode::Down => {
+                    if app.research_selected_level < 4 {
+                        app.research_selected_level += 1;
+                    }
+                    KeyAction::Continue
+                }
+                KeyCode::Enter => {
+                    let rid = ui::research::selected_research_id(app);
+                    if let Some(rid) = rid {
+                        match app.state.try_start_research(&rid) {
+                            Ok(()) => {
+                                let def = misanthropic::research::ResearchDef::get(&rid);
+                                app.set_status(format!(
+                                    "Started researching: {}",
+                                    def.name
+                                ));
+                            }
+                            Err(e) => {
+                                app.set_status(e);
+                            }
+                        }
+                    }
+                    KeyAction::Continue
+                }
+                _ => KeyAction::Continue,
+            }
+        }
+        Screen::Combat | Screen::Leaderboard => {
             match code {
                 KeyCode::Esc => {
                     app.screen = Screen::Dashboard;

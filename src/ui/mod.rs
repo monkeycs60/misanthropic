@@ -1,6 +1,7 @@
 pub mod boot;
 pub mod buildings;
 pub mod dashboard;
+pub mod research;
 
 use misanthropic::state::GameState;
 use std::time::Instant;
@@ -27,6 +28,8 @@ pub struct App {
     pub notification: Option<(String, Instant)>,
     pub building_tab: u8,
     pub building_selected: usize,
+    pub research_selected_branch: u8,
+    pub research_selected_level: u8,
 }
 
 impl App {
@@ -48,6 +51,8 @@ impl App {
             notification: None,
             building_tab: 0,
             building_selected: 0,
+            research_selected_branch: 0,
+            research_selected_level: 0,
         }
     }
 
