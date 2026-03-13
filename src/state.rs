@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 
-use crate::buildings::{BuildingDef, BuildingType, BuildingCategory, BUILDING_DEFS};
+use crate::buildings::{BuildingDef, BuildingType, BuildingCategory};
 use crate::economy;
 use crate::research::{ResearchId, ResearchDef};
 use crate::prestige::ForkSpec;
