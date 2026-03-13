@@ -314,61 +314,50 @@ fn render_detail_panel(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(paragraph, area);
 }
 
+fn mini_gauge(current: f64, max: f64, bar_w: usize) -> String {
+    let ratio = if max > 0.0 { (current / max).min(1.0) } else { 0.0 };
+    let filled = (ratio * bar_w as f64).round() as usize;
+    let empty = bar_w.saturating_sub(filled);
+    format!("{}{}", "\u{25B0}".repeat(filled), "\u{25B1}".repeat(empty))
+}
+
 fn render_resource_bar(f: &mut Frame, app: &App, area: Rect) {
     let res = &app.state.resources;
     let narrow = area.width < 50;
+    let bar_w = if narrow { 4 } else { 6 };
 
     let block = Block::default()
         .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
         .border_style(Style::default().fg(Color::DarkGray));
 
-    if narrow {
-        // Compact: use short format with K suffix
-        let line = Line::from(vec![
-            Span::styled(" \u{1F4B0}", Style::default().fg(Color::Yellow)),
-            Span::styled(
-                format!("${}/{}", fmt_short(res.compute), fmt_short(res.max_compute)),
-                Style::default().fg(Color::White),
-            ),
-            Span::raw(" "),
-            Span::styled("\u{1F4E1}", Style::default().fg(Color::Cyan)),
-            Span::styled(
-                format!("{}/{}", fmt_short(res.data), fmt_short(res.max_data)),
-                Style::default().fg(Color::White),
-            ),
-            Span::raw(" "),
-            Span::styled("\u{1F525}", Style::default().fg(Color::Red)),
-            Span::styled(
-                format!("{:.0}/{:.0}", res.hype, res.max_hype),
-                Style::default().fg(Color::White),
-            ),
-        ]);
-        let paragraph = Paragraph::new(line).block(block);
-        f.render_widget(paragraph, area);
-    } else {
-        let line = Line::from(vec![
-            Span::raw("  "),
-            Span::styled("\u{1F4B0} ", Style::default().fg(Color::Yellow)),
-            Span::styled(
-                format!("${} / ${}", format_number(res.compute), format_number(res.max_compute)),
-                Style::default().fg(Color::White),
-            ),
-            Span::raw("   "),
-            Span::styled("\u{1F4E1} ", Style::default().fg(Color::Cyan)),
-            Span::styled(
-                format!("{} / {}", format_number(res.data), format_number(res.max_data)),
-                Style::default().fg(Color::White),
-            ),
-            Span::raw("   "),
-            Span::styled("\u{1F525} ", Style::default().fg(Color::Red)),
-            Span::styled(
-                format!("{:.1} / {:.1}", res.hype, res.max_hype),
-                Style::default().fg(Color::White),
-            ),
-        ]);
-        let paragraph = Paragraph::new(line).block(block);
-        f.render_widget(paragraph, area);
-    }
+    let compute_bar = mini_gauge(res.compute as f64, res.max_compute as f64, bar_w);
+    let data_bar = mini_gauge(res.data as f64, res.max_data as f64, bar_w);
+    let hype_bar = mini_gauge(res.hype, res.max_hype, bar_w);
+
+    let line = Line::from(vec![
+        Span::styled(" \u{1F4B0}", Style::default().fg(Color::Yellow)),
+        Span::styled(
+            if narrow { format!("${}", fmt_short(res.compute)) } else { format!("${}", format_number(res.compute)) },
+            Style::default().fg(Color::White),
+        ),
+        Span::styled(compute_bar, Style::default().fg(Color::Yellow)),
+        Span::raw("  "),
+        Span::styled("\u{1F4E1}", Style::default().fg(Color::Cyan)),
+        Span::styled(
+            if narrow { fmt_short(res.data) } else { format_number(res.data) },
+            Style::default().fg(Color::White),
+        ),
+        Span::styled(data_bar, Style::default().fg(Color::Cyan)),
+        Span::raw("  "),
+        Span::styled("\u{1F525}", Style::default().fg(Color::Red)),
+        Span::styled(
+            format!("{:.0}", res.hype),
+            Style::default().fg(Color::White),
+        ),
+        Span::styled(hype_bar, Style::default().fg(Color::Red)),
+    ]);
+    let paragraph = Paragraph::new(line).block(block);
+    f.render_widget(paragraph, area);
 }
 
 fn render_help(f: &mut Frame, area: Rect) {
