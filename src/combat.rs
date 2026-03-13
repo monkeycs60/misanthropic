@@ -32,11 +32,11 @@ impl AttackType {
 
     pub fn hype_cost(&self) -> f64 {
         match self {
-            AttackType::BotFlood => 80.0,
-            AttackType::SlopCannon => 120.0,
-            AttackType::DeepfakeDrop => 200.0,
-            AttackType::OpenClawSwarm => 150.0,
-            AttackType::KStreetLobby => 250.0,
+            AttackType::BotFlood => 30.0,
+            AttackType::SlopCannon => 50.0,
+            AttackType::DeepfakeDrop => 80.0,
+            AttackType::OpenClawSwarm => 60.0,
+            AttackType::KStreetLobby => 100.0,
         }
     }
 }
@@ -212,8 +212,8 @@ pub fn resolve_battle(
     }
 
     let victory = channels_total > 0 && channels_breached > channels_total / 2;
-    let hype_stolen = if victory { 85.0 } else { 0.0 };
-    let compute_stolen = if victory { 240 } else { 0 };
+    let hype_stolen = if victory { 200.0 } else { 0.0 };
+    let compute_stolen = if victory { 800 } else { 0 };
 
     BattleResult {
         events,

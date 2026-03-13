@@ -24,9 +24,9 @@ impl Default for Resources {
             compute: 0,
             data: 0,
             hype: 0.0,
-            max_compute: 2500,  // base storage
-            max_data: 500,
-            max_hype: 200.0,
+            max_compute: 5000,  // base storage
+            max_data: 1000,
+            max_hype: 400.0,
         }
     }
 }
@@ -439,7 +439,7 @@ impl GameState {
     /// Return the current tutorial message, or None if the tutorial is complete.
     pub fn tutorial_message(&self) -> Option<&'static str> {
         match self.tutorial_step {
-            0 => Some("\u{25BA} Tokens=\u{26A1}Compute, tools=\u{1F4E1}Data. Press [B] to build a CPU Core!"),
+            0 => Some("\u{25BA} 25 tokens=1\u{26A1}Compute, tools=\u{1F4E1}Data. [B] Build a CPU Core!"),
             1 => Some("\u{25BA} CPU online! [B] Build a Ram Bank to store \u{1F4E1}Data for research."),
             2 => Some("\u{25BA} Host is coding \u{2014} \u{26A1}and \u{1F4E1} flow in. Spread AI across the planet!"),
             3 => Some("\u{25BA} Got Data! [R] Research Social Engineering to unlock propaganda."),
