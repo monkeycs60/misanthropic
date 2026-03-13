@@ -24,9 +24,9 @@ impl Default for Resources {
             compute: 0,
             data: 0,
             hype: 0.0,
-            max_compute: 500,  // base storage (1 CPU Core equivalent)
-            max_data: 200,
-            max_hype: 100.0,
+            max_compute: 2500,  // base storage
+            max_data: 500,
+            max_hype: 200.0,
         }
     }
 }
@@ -252,9 +252,9 @@ impl GameState {
         let ram_level = self.building_level(&BuildingType::RamBank);
         let gpu_level = self.building_level(&BuildingType::GpuRig);
 
-        self.resources.max_compute = 500 + economy::storage_bonus(&BuildingType::CpuCore, cpu_level);
-        self.resources.max_data = 200 + economy::storage_bonus(&BuildingType::RamBank, ram_level);
-        self.resources.max_hype = 100.0 + economy::storage_bonus(&BuildingType::GpuRig, gpu_level) as f64;
+        self.resources.max_compute = 2500 + economy::storage_bonus(&BuildingType::CpuCore, cpu_level);
+        self.resources.max_data = 500 + economy::storage_bonus(&BuildingType::RamBank, ram_level);
+        self.resources.max_hype = 200.0 + economy::storage_bonus(&BuildingType::GpuRig, gpu_level) as f64;
     }
 
     /// Total hype per hour from all propaganda buildings, with datacenter multiplier.

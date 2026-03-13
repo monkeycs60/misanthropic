@@ -62,7 +62,7 @@ fn test_build_cpu_core() {
     assert!(result.is_ok());
     assert_eq!(gs.building_level(&BuildingType::CpuCore), 1);
     assert_eq!(gs.resources.compute, 500); // 1000 - 500
-    assert_eq!(gs.resources.max_compute, 1000); // base 500 + 500 from CPU Core Lv1
+    assert_eq!(gs.resources.max_compute, 3300); // base 2500 + 800 from CPU Core Lv1
 }
 
 #[test]

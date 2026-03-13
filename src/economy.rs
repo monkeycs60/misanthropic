@@ -31,15 +31,23 @@ pub fn fork_compute_multiplier(fork_count: u32) -> f64 {
 }
 
 /// Storage bonus from building level.
+/// Scales exponentially (×1.8) to match building cost scaling,
+/// so the storage cap always stays ahead of the next upgrade cost.
 pub fn storage_bonus(building_type: &crate::buildings::BuildingType, level: u8) -> u64 {
     use crate::buildings::BuildingType;
-    let per_level = match building_type {
-        BuildingType::CpuCore => 500,
-        BuildingType::RamBank => 200,
-        BuildingType::GpuRig => 300,
-        _ => 0,
+    if level == 0 {
+        return 0;
+    }
+    let base = match building_type {
+        BuildingType::CpuCore => 800,
+        BuildingType::RamBank => 300,
+        BuildingType::GpuRig => 400,
+        _ => return 0,
     };
-    per_level * level as u64
+    // Cumulative: sum of base * 1.8^(i-1) for i=1..=level
+    (0..level as i32)
+        .map(|i| (base as f64 * 1.8_f64.powi(i)) as u64)
+        .sum()
 }
 
 /// GPU Cluster: research time reduction. -10% per level (multiplicative).
