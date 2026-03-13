@@ -232,47 +232,8 @@ fn render(frame: &mut ratatui::Frame, app: &App) {
         Screen::CombatMenu => ui::combat_menu::render_combat_menu(frame, app),
         Screen::PvE => ui::combat::render_pve(frame, app),
         Screen::PvP => ui::combat::render_pvp_placeholder(frame),
-        Screen::Leaderboard => {
-            render_placeholder(frame, &app.screen);
-        }
+        Screen::Leaderboard => ui::leaderboard::render_leaderboard(frame, app),
     }
-}
-
-fn render_placeholder(frame: &mut ratatui::Frame, screen: &Screen) {
-    use ratatui::layout::Alignment;
-    use ratatui::style::{Color, Style};
-    use ratatui::text::{Line, Span};
-    use ratatui::widgets::{Block, Borders, Paragraph};
-
-    let title = match screen {
-        Screen::Leaderboard => "LEADERBOARD",
-        _ => "",
-    };
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(format!(" {} ", title))
-        .title_alignment(Alignment::Center);
-
-    let text = vec![
-        Line::from(""),
-        Line::from(Span::styled(
-            "Coming soon...",
-            Style::default().fg(Color::DarkGray),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(
-            "[Esc] Back to Dashboard",
-            Style::default().fg(Color::Yellow),
-        )),
-    ];
-
-    let paragraph = Paragraph::new(text)
-        .block(block)
-        .alignment(Alignment::Center);
-
-    frame.render_widget(paragraph, frame.area());
 }
 
 enum KeyAction {
@@ -327,7 +288,7 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
             }
             KeyCode::Char('l') | KeyCode::Char('L') => {
                 app.screen = Screen::Leaderboard;
-                app.selected_index = 0;
+                app.leaderboard_tab = 0;
                 KeyAction::Continue
             }
             _ => KeyAction::Continue,
@@ -511,6 +472,18 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
                     KeyAction::Continue
                 }
                 KeyCode::Char('q') | KeyCode::Char('Q') => KeyAction::Quit,
+                KeyCode::Tab => {
+                    app.leaderboard_tab = (app.leaderboard_tab + 1) % 6;
+                    KeyAction::Continue
+                }
+                KeyCode::BackTab => {
+                    app.leaderboard_tab = if app.leaderboard_tab == 0 {
+                        5
+                    } else {
+                        app.leaderboard_tab - 1
+                    };
+                    KeyAction::Continue
+                }
                 _ => KeyAction::Continue,
             }
         }

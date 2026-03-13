@@ -3,6 +3,7 @@ pub mod buildings;
 pub mod combat;
 pub mod combat_menu;
 pub mod dashboard;
+pub mod leaderboard;
 pub mod research;
 
 use misanthropic::combat::PveBattleResult;
@@ -49,6 +50,7 @@ pub struct App {
     pub combat_result: Option<PveBattleResult>,
     pub combat_phase: CombatPhase,
     pub combat_menu_selected: usize,
+    pub leaderboard_tab: u8,
 }
 
 impl App {
@@ -78,6 +80,7 @@ impl App {
             combat_result: None,
             combat_phase: CombatPhase::SectorSelect,
             combat_menu_selected: 0,
+            leaderboard_tab: 0,
         }
     }
 

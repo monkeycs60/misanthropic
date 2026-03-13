@@ -114,6 +114,7 @@ pub struct GameState {
     pub boot_sequence_done: bool,
     pub tutorial_step: u8,
     pub compute_multiplier: f64,  // from Fork bonuses
+    pub streak_days: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -176,6 +177,7 @@ impl GameState {
             boot_sequence_done: false,
             tutorial_step: 0,
             compute_multiplier: 1.0,
+            streak_days: 0,
         }
     }
 
