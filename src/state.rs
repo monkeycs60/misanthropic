@@ -1,0 +1,196 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use chrono::{DateTime, Utc};
+
+use crate::buildings::BuildingType;
+use crate::research::ResearchId;
+use crate::prestige::ForkSpec;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Resources {
+    pub compute: u64,
+    pub data: u64,
+    pub hype: f64,
+    pub max_compute: u64,
+    pub max_data: u64,
+    pub max_hype: f64,
+}
+
+impl Default for Resources {
+    fn default() -> Self {
+        Self {
+            compute: 0,
+            data: 0,
+            hype: 0.0,
+            max_compute: 500,  // base storage (1 CPU Core equivalent)
+            max_data: 200,
+            max_hype: 100.0,
+        }
+    }
+}
+
+impl Resources {
+    pub fn add_compute(&mut self, amount: u64) {
+        self.compute = (self.compute + amount).min(self.max_compute);
+    }
+
+    pub fn add_data(&mut self, amount: u64) {
+        self.data = (self.data + amount).min(self.max_data);
+    }
+
+    pub fn add_hype(&mut self, amount: f64) {
+        self.hype = (self.hype + amount).min(self.max_hype);
+    }
+
+    pub fn try_spend_compute(&mut self, amount: u64) -> bool {
+        if self.compute >= amount {
+            self.compute -= amount;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn try_spend_data(&mut self, amount: u64) -> bool {
+        if self.data >= amount {
+            self.data -= amount;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn try_spend_hype(&mut self, amount: f64) -> bool {
+        if self.hype >= amount {
+            self.hype -= amount;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn can_afford(&self, compute: u64, data: u64, hype: f64) -> bool {
+        self.compute >= compute && self.data >= data && self.hype >= hype
+    }
+
+    pub fn spend(&mut self, compute: u64, data: u64, hype: f64) -> bool {
+        if self.can_afford(compute, data, hype) {
+            self.compute -= compute;
+            self.data -= data;
+            self.hype -= hype;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameState {
+    pub resources: Resources,
+    pub buildings: HashMap<BuildingType, u8>,      // building -> level (0 = not built)
+    pub researched: HashMap<ResearchId, bool>,
+    pub research_choices: HashMap<ResearchId, u8>,  // choice index at branch points
+    pub active_research: Option<ActiveResearch>,
+    pub sectors: HashMap<String, SectorProgress>,
+    pub fork_count: u32,
+    pub fork_specs: Vec<ForkSpec>,
+    pub lifetime_compute: u64,
+    pub lifetime_tokens: u64,
+    pub lifetime_tool_calls: u64,
+    pub pvp_rating: u32,
+    pub pvp_wins: u32,
+    pub pvp_losses: u32,
+    pub last_attack_time: Option<DateTime<Utc>>,
+    pub attacks_received_today: u8,
+    pub daily_reset: Option<DateTime<Utc>>,
+    pub player_id: String,
+    pub player_name: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub last_active: DateTime<Utc>,
+    pub last_hype_tick: DateTime<Utc>,
+    pub boot_sequence_done: bool,
+    pub tutorial_step: u8,
+    pub compute_multiplier: f64,  // from Fork bonuses
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActiveResearch {
+    pub research_id: ResearchId,
+    pub started_at: DateTime<Utc>,
+    pub duration_secs: u64,
+}
+
+impl ActiveResearch {
+    pub fn is_complete(&self) -> bool {
+        let elapsed = (Utc::now() - self.started_at).num_seconds() as u64;
+        elapsed >= self.duration_secs
+    }
+
+    pub fn progress_pct(&self) -> f64 {
+        let elapsed = (Utc::now() - self.started_at).num_seconds() as f64;
+        (elapsed / self.duration_secs as f64).min(1.0)
+    }
+
+    pub fn remaining_secs(&self) -> u64 {
+        let elapsed = (Utc::now() - self.started_at).num_seconds() as u64;
+        self.duration_secs.saturating_sub(elapsed)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SectorProgress {
+    pub current_layer: u8,
+    pub max_layers: u8,
+    pub conversion_pct: f64,
+}
+
+impl GameState {
+    pub fn new() -> Self {
+        let now = Utc::now();
+        Self {
+            resources: Resources::default(),
+            buildings: HashMap::new(),
+            researched: HashMap::new(),
+            research_choices: HashMap::new(),
+            active_research: None,
+            sectors: HashMap::new(),
+            fork_count: 0,
+            fork_specs: Vec::new(),
+            lifetime_compute: 0,
+            lifetime_tokens: 0,
+            lifetime_tool_calls: 0,
+            pvp_rating: 1000,
+            pvp_wins: 0,
+            pvp_losses: 0,
+            last_attack_time: None,
+            attacks_received_today: 0,
+            daily_reset: None,
+            player_id: uuid::Uuid::new_v4().to_string(),
+            player_name: None,
+            created_at: now,
+            last_active: now,
+            last_hype_tick: now,
+            boot_sequence_done: false,
+            tutorial_step: 0,
+            compute_multiplier: 1.0,
+        }
+    }
+
+    /// Global dominance = average conversion across all 6 sectors
+    pub fn global_dominance(&self) -> f64 {
+        if self.sectors.is_empty() {
+            return 0.0;
+        }
+        let total: f64 = self.sectors.values().map(|s| s.conversion_pct).sum();
+        total / 6.0  // always out of 6 sectors
+    }
+
+    pub fn building_level(&self, bt: &BuildingType) -> u8 {
+        *self.buildings.get(bt).unwrap_or(&0)
+    }
+
+    pub fn has_research(&self, id: &ResearchId) -> bool {
+        *self.researched.get(id).unwrap_or(&false)
+    }
+}
