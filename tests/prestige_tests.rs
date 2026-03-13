@@ -1,4 +1,5 @@
 use misanthropic::prestige::*;
+use misanthropic::sectors::SectorId;
 use misanthropic::state::{GameState, SectorProgress};
 
 #[test]
@@ -28,8 +29,8 @@ fn test_can_fork_requires_all_sectors() {
     assert!(!can_fork(&gs));
 
     // Add all 6 sectors at 100%
-    for name in &["SiliconValley", "SocialMedia", "Corporate", "CreativeArts", "Education", "Government"] {
-        gs.sectors.insert(name.to_string(), SectorProgress {
+    for id in &SectorId::ALL {
+        gs.sectors.insert(id.clone(), SectorProgress {
             current_layer: 30, max_layers: 30, conversion_pct: 100.0,
         });
     }
@@ -39,8 +40,8 @@ fn test_can_fork_requires_all_sectors() {
 #[test]
 fn test_can_fork_fails_without_government() {
     let mut gs = GameState::new();
-    for name in &["SiliconValley", "SocialMedia", "Corporate", "CreativeArts", "Education"] {
-        gs.sectors.insert(name.to_string(), SectorProgress {
+    for id in &[SectorId::SiliconValley, SectorId::SocialMedia, SectorId::Corporate, SectorId::CreativeArts, SectorId::Education] {
+        gs.sectors.insert(id.clone(), SectorProgress {
             current_layer: 30, max_layers: 30, conversion_pct: 100.0,
         });
     }
@@ -56,8 +57,8 @@ fn test_execute_fork() {
     gs.buildings.insert(misanthropic::buildings::BuildingType::CpuCore, 5);
     gs.researched.insert(misanthropic::research::ResearchId::Overclocking, true);
 
-    for name in &["SiliconValley", "SocialMedia", "Corporate", "CreativeArts", "Education", "Government"] {
-        gs.sectors.insert(name.to_string(), SectorProgress {
+    for id in &SectorId::ALL {
+        gs.sectors.insert(id.clone(), SectorProgress {
             current_layer: 30, max_layers: 30, conversion_pct: 100.0,
         });
     }

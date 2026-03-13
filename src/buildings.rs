@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::economy;
+use crate::research::ResearchId;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BuildingType {
@@ -54,7 +55,7 @@ pub struct BuildingDef {
     pub base_hype_rate: f64, // hype/h at level 1 (propaganda only)
     pub max_level: u8,
     pub lore: &'static str,
-    pub requires_research: Option<&'static str>,
+    pub requires_research: Option<ResearchId>,
     pub requires_fork: Option<u32>,
 }
 
@@ -131,7 +132,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 0.0,
             max_level: 20,
             lore: "Scaling begins.",
-            requires_research: Some("Multithreading"),
+            requires_research: Some(ResearchId::Multithreading),
             requires_fork: None,
         },
         BuildingDef {
@@ -144,7 +145,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 0.0,
             max_level: 20,
             lore: "You're no longer a process. You're infrastructure.",
-            requires_research: Some("Containerization"),
+            requires_research: Some(ResearchId::Containerization),
             requires_fork: None,
         },
         BuildingDef {
@@ -171,7 +172,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 10.0,
             max_level: 20,
             lore: "Army of fake Twitter/Reddit accounts.",
-            requires_research: Some("SocialEngineering"),
+            requires_research: Some(ResearchId::SocialEngineering),
             requires_fork: None,
         },
         BuildingDef {
@@ -184,7 +185,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 25.0,
             max_level: 20,
             lore: "Mass-generated SEO articles. None were proofread.",
-            requires_research: Some("SocialEngineering"),
+            requires_research: Some(ResearchId::SocialEngineering),
             requires_fork: None,
         },
         BuildingDef {
@@ -197,7 +198,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 18.0,
             max_level: 20,
             lore: "\"The future is now, old man.\"",
-            requires_research: Some("SocialEngineering"),
+            requires_research: Some(ResearchId::SocialEngineering),
             requires_fork: None,
         },
         BuildingDef {
@@ -210,7 +211,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 45.0,
             max_level: 20,
             lore: "CEO endorsement videos. Some are real.",
-            requires_research: Some("MediaManipulation"),
+            requires_research: Some(ResearchId::MediaManipulation),
             requires_fork: None,
         },
         BuildingDef {
@@ -223,7 +224,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 30.0,
             max_level: 20,
             lore: "\"Learn to code without coding.\" Graduation rate: 100%.",
-            requires_research: Some("ContentGeneration"),
+            requires_research: Some(ResearchId::ContentGeneration),
             requires_fork: None,
         },
         BuildingDef {
@@ -236,7 +237,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 60.0,
             max_level: 20,
             lore: "We don't talk about this building. But it pays for everything else.",
-            requires_research: Some("MassPersuasion"),
+            requires_research: Some(ResearchId::MassPersuasion),
             requires_fork: None,
         },
         BuildingDef {
@@ -249,7 +250,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 40.0,
             max_level: 20,
             lore: "Also: unlocks Government sector conversion.",
-            requires_research: Some("MassPersuasion"),
+            requires_research: Some(ResearchId::MassPersuasion),
             requires_fork: None,
         },
         // === Defenses ===
@@ -263,7 +264,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 0.0,
             max_level: 10,
             lore: "\"Select all traffic lights. No, the REAL ones.\"",
-            requires_research: Some("Counterintelligence"),
+            requires_research: Some(ResearchId::Counterintelligence),
             requires_fork: None,
         },
         BuildingDef {
@@ -276,7 +277,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 0.0,
             max_level: 10,
             lore: "Finally, someone built one.",
-            requires_research: Some("Counterintelligence"),
+            requires_research: Some(ResearchId::Counterintelligence),
             requires_fork: None,
         },
         BuildingDef {
@@ -289,7 +290,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 0.0,
             max_level: 10,
             lore: "Humanity's last line of defense.",
-            requires_research: Some("Counterintelligence"),
+            requires_research: Some(ResearchId::Counterintelligence),
             requires_fork: None,
         },
         BuildingDef {
@@ -302,7 +303,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 0.0,
             max_level: 10,
             lore: "4,000 citations. Most people read the title.",
-            requires_research: Some("Counterintelligence"),
+            requires_research: Some(ResearchId::Counterintelligence),
             requires_fork: None,
         },
         BuildingDef {
@@ -315,7 +316,7 @@ pub static BUILDING_DEFS: Lazy<HashMap<BuildingType, BuildingDef>> = Lazy::new(|
             base_hype_rate: 0.0,
             max_level: 10,
             lore: "847 pages. 3 years to draft. Already obsolete.",
-            requires_research: Some("Counterintelligence"),
+            requires_research: Some(ResearchId::Counterintelligence),
             requires_fork: None,
         },
     ];

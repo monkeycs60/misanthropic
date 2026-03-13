@@ -31,11 +31,12 @@ pub fn fork_compute_multiplier(fork_count: u32) -> f64 {
 }
 
 /// Storage bonus from building level.
-pub fn storage_bonus(building_type: &str, level: u8) -> u64 {
+pub fn storage_bonus(building_type: &crate::buildings::BuildingType, level: u8) -> u64 {
+    use crate::buildings::BuildingType;
     let per_level = match building_type {
-        "CpuCore" => 500,
-        "RamBank" => 200,
-        "GpuRig" => 300,
+        BuildingType::CpuCore => 500,
+        BuildingType::RamBank => 200,
+        BuildingType::GpuRig => 300,
         _ => 0,
     };
     per_level * level as u64

@@ -6,6 +6,7 @@ use crate::buildings::{BuildingDef, BuildingType, BuildingCategory, BUILDING_DEF
 use crate::economy;
 use crate::research::{ResearchId, ResearchDef};
 use crate::prestige::ForkSpec;
+use crate::sectors::SectorId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resources {
@@ -93,7 +94,7 @@ pub struct GameState {
     pub researched: HashMap<ResearchId, bool>,
     pub research_choices: HashMap<ResearchId, u8>,  // choice index at branch points
     pub active_research: Option<ActiveResearch>,
-    pub sectors: HashMap<String, SectorProgress>,
+    pub sectors: HashMap<SectorId, SectorProgress>,
     pub fork_count: u32,
     pub fork_specs: Vec<ForkSpec>,
     pub lifetime_compute: u64,
@@ -202,6 +203,27 @@ impl GameState {
         if current >= def.max_level {
             return Err(format!("{} is already at max level {}", def.name, def.max_level));
         }
+
+        // Check research prerequisite
+        if let Some(ref req) = def.requires_research {
+            if !self.has_research(req) {
+                return Err(format!(
+                    "{} requires research: {:?}",
+                    def.name, req
+                ));
+            }
+        }
+
+        // Check fork prerequisite
+        if let Some(req_fork) = def.requires_fork {
+            if self.fork_count < req_fork {
+                return Err(format!(
+                    "{} requires {} fork(s), you have {}",
+                    def.name, req_fork, self.fork_count
+                ));
+            }
+        }
+
         let next = current + 1;
         let cost = def.cost_at_level(next);
         if !self.resources.can_afford(cost.compute, cost.data, cost.hype) {
@@ -222,9 +244,9 @@ impl GameState {
         let ram_level = self.building_level(&BuildingType::RamBank);
         let gpu_level = self.building_level(&BuildingType::GpuRig);
 
-        self.resources.max_compute = 500 + economy::storage_bonus("CpuCore", cpu_level);
-        self.resources.max_data = 200 + economy::storage_bonus("RamBank", ram_level);
-        self.resources.max_hype = 100.0 + economy::storage_bonus("GpuRig", gpu_level) as f64;
+        self.resources.max_compute = 500 + economy::storage_bonus(&BuildingType::CpuCore, cpu_level);
+        self.resources.max_data = 200 + economy::storage_bonus(&BuildingType::RamBank, ram_level);
+        self.resources.max_hype = 100.0 + economy::storage_bonus(&BuildingType::GpuRig, gpu_level) as f64;
     }
 
     /// Total hype per hour from all propaganda buildings, with datacenter multiplier.
@@ -302,6 +324,10 @@ impl GameState {
 
     /// Check if active research has completed. If so, mark it as researched,
     /// clear active_research, and return the completed ResearchId.
+    ///
+    /// If the completed research has `has_choice == true`, the caller should
+    /// subsequently call `record_research_choice()` to record which branch
+    /// the player picks.
     pub fn check_research_completion(&mut self) -> Option<ResearchId> {
         let is_complete = self
             .active_research
@@ -317,6 +343,30 @@ impl GameState {
         } else {
             None
         }
+    }
+
+    /// Record a branch choice for a completed research that has `has_choice == true`.
+    ///
+    /// Returns `Err` if the research hasn't been completed or doesn't offer a choice,
+    /// or if the choice index is out of range.
+    pub fn record_research_choice(&mut self, id: &ResearchId, choice: u8) -> Result<(), String> {
+        if !self.has_research(id) {
+            return Err(format!("{:?} has not been researched yet", id));
+        }
+        let def = ResearchDef::get(id);
+        if !def.has_choice {
+            return Err(format!("{:?} does not have a branch choice", id));
+        }
+        if choice as usize >= def.choice_names.len() {
+            return Err(format!(
+                "Invalid choice index {} for {:?} (max {})",
+                choice,
+                id,
+                def.choice_names.len() - 1
+            ));
+        }
+        self.research_choices.insert(id.clone(), choice);
+        Ok(())
     }
 
     /// Convert incoming tokens and tool calls into resources.

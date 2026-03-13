@@ -195,3 +195,100 @@ fn test_cannot_research_insufficient_data() {
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("data"));
 }
+
+// --- Building gate tests ---
+
+#[test]
+fn test_build_requires_research() {
+    let mut gs = GameState::new();
+    gs.resources.compute = 100_000;
+    gs.resources.max_compute = 200_000;
+    gs.resources.data = 100_000;
+    gs.resources.max_data = 200_000;
+    // BotFarm requires SocialEngineering research
+    let result = gs.try_build(&BuildingType::BotFarm);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("requires research"));
+}
+
+#[test]
+fn test_build_succeeds_with_research() {
+    let mut gs = GameState::new();
+    gs.resources.compute = 100_000;
+    gs.resources.max_compute = 200_000;
+    gs.resources.data = 100_000;
+    gs.resources.max_data = 200_000;
+    gs.researched.insert(ResearchId::SocialEngineering, true);
+    let result = gs.try_build(&BuildingType::BotFarm);
+    assert!(result.is_ok());
+    assert_eq!(gs.building_level(&BuildingType::BotFarm), 1);
+}
+
+#[test]
+fn test_build_requires_fork() {
+    let mut gs = GameState::new();
+    gs.resources.compute = 500_000;
+    gs.resources.max_compute = 1_000_000;
+    gs.resources.data = 100_000;
+    gs.resources.max_data = 200_000;
+    gs.resources.hype = 100_000.0;
+    gs.resources.max_hype = 200_000.0;
+    // QuantumCore requires fork_count >= 1
+    let result = gs.try_build(&BuildingType::QuantumCore);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("fork"));
+}
+
+#[test]
+fn test_build_succeeds_with_fork() {
+    let mut gs = GameState::new();
+    gs.resources.compute = 500_000;
+    gs.resources.max_compute = 1_000_000;
+    gs.resources.data = 100_000;
+    gs.resources.max_data = 200_000;
+    gs.resources.hype = 100_000.0;
+    gs.resources.max_hype = 200_000.0;
+    gs.fork_count = 1;
+    let result = gs.try_build(&BuildingType::QuantumCore);
+    assert!(result.is_ok());
+    assert_eq!(gs.building_level(&BuildingType::QuantumCore), 1);
+}
+
+// --- Research choice tests ---
+
+#[test]
+fn test_record_research_choice() {
+    let mut gs = GameState::new();
+    // Mark LoadBalancing as researched (it has_choice = true)
+    gs.researched.insert(ResearchId::LoadBalancing, true);
+    let result = gs.record_research_choice(&ResearchId::LoadBalancing, 0);
+    assert!(result.is_ok());
+    assert_eq!(gs.research_choices.get(&ResearchId::LoadBalancing), Some(&0));
+}
+
+#[test]
+fn test_record_research_choice_invalid_index() {
+    let mut gs = GameState::new();
+    gs.researched.insert(ResearchId::LoadBalancing, true);
+    let result = gs.record_research_choice(&ResearchId::LoadBalancing, 5);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Invalid choice"));
+}
+
+#[test]
+fn test_record_research_choice_not_researched() {
+    let mut gs = GameState::new();
+    let result = gs.record_research_choice(&ResearchId::LoadBalancing, 0);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("not been researched"));
+}
+
+#[test]
+fn test_record_research_choice_no_choice() {
+    let mut gs = GameState::new();
+    // Overclocking has_choice = false
+    gs.researched.insert(ResearchId::Overclocking, true);
+    let result = gs.record_research_choice(&ResearchId::Overclocking, 0);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("does not have a branch"));
+}

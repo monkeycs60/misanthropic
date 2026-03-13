@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::sectors::SectorId;
 use crate::state::GameState;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -65,18 +66,9 @@ pub fn fork_specs_for_tier(tier: u32) -> Vec<ForkSpec> {
     }
 }
 
-const REQUIRED_SECTORS: &[&str] = &[
-    "SiliconValley",
-    "SocialMedia",
-    "Corporate",
-    "CreativeArts",
-    "Education",
-    "Government",
-];
-
 pub fn can_fork(state: &GameState) -> bool {
-    for name in REQUIRED_SECTORS {
-        match state.sectors.get(*name) {
+    for id in &SectorId::ALL {
+        match state.sectors.get(id) {
             Some(progress) => {
                 if progress.conversion_pct < 100.0 {
                     return false;

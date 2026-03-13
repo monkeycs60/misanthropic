@@ -1,5 +1,7 @@
 // Combat system: attack/defense types, interaction matrix, battle resolution
 
+use crate::enemies::EnemyDef;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AttackType {
     BotFlood,
@@ -229,4 +231,56 @@ pub fn total_attack_cost(attacks: &[AttackInstance]) -> f64 {
         .iter()
         .map(|a| a.attack_type.hype_cost() * a.count as f64)
         .sum()
+}
+
+#[derive(Debug, Clone)]
+pub struct PveBattleEvent {
+    pub attack: AttackType,
+    pub base_damage: f64,
+    pub multiplier: f64,
+    pub effective_damage: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct PveBattleResult {
+    pub damage_dealt: f64,
+    pub enemy_defeated: bool,
+    pub events: Vec<PveBattleEvent>,
+}
+
+/// Resolve a PvE battle: attacks against a single enemy.
+///
+/// Each attack's damage is modified by enemy resistances and weaknesses:
+/// - If attack type is in enemy.weaknesses: x1.5 damage
+/// - If attack type is in enemy.resistances: x0.5 damage
+/// - Otherwise: x1.0
+pub fn resolve_pve_battle(attacks: &[AttackInstance], enemy: &EnemyDef) -> PveBattleResult {
+    let mut total_damage = 0.0_f64;
+    let mut events = Vec::new();
+
+    for atk in attacks {
+        let base = attack_power(&atk.attack_type) * atk.count as f64;
+        let multiplier = if enemy.weaknesses.contains(&atk.attack_type) {
+            1.5
+        } else if enemy.resistances.contains(&atk.attack_type) {
+            0.5
+        } else {
+            1.0
+        };
+        let effective = base * multiplier;
+        total_damage += effective;
+
+        events.push(PveBattleEvent {
+            attack: atk.attack_type,
+            base_damage: base,
+            multiplier,
+            effective_damage: effective,
+        });
+    }
+
+    PveBattleResult {
+        damage_dealt: total_damage,
+        enemy_defeated: total_damage >= enemy.hp as f64,
+        events,
+    }
 }
