@@ -340,8 +340,8 @@ fn render_notification(f: &mut Frame, msg: &str, area: Rect) {
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow))
-        .title(" INCOMING ")
+        .border_style(Style::default().fg(Color::Green))
+        .title(" \u{26A1} COMPUTE ")
         .title_alignment(Alignment::Center);
 
     let paragraph = Paragraph::new(vec![
@@ -349,7 +349,7 @@ fn render_notification(f: &mut Frame, msg: &str, area: Rect) {
         Line::from(Span::styled(
             msg,
             Style::default()
-                .fg(Color::Yellow)
+                .fg(Color::Green)
                 .add_modifier(Modifier::BOLD),
         )),
     ])
