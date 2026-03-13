@@ -126,7 +126,7 @@ fn render_title_bar(f: &mut Frame, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::DarkGray))
-        .title(" RESEARCH ")
+        .title(" [Esc] Dashboard | RESEARCH ")
         .title_alignment(Alignment::Center);
 
     let text = Line::from(vec![
@@ -335,8 +335,8 @@ fn render_detail_panel(f: &mut Frame, app: &App, area: Rect) {
             let has_active = app.state.active_research.is_some();
             if has_active {
                 Span::styled(
-                    "    Status: Available \u{2014} another research in progress".to_string(),
-                    Style::default().fg(Color::Yellow),
+                    "    Status: Unavailable \u{2014} another research in progress".to_string(),
+                    Style::default().fg(Color::DarkGray),
                 )
             } else if can_afford {
                 Span::styled(

@@ -24,7 +24,7 @@ pub fn render_combat_menu(f: &mut Frame, app: &App) {
     let title_block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::DarkGray))
-        .title(" COMBAT ")
+        .title(" [Esc] Dashboard | COMBAT ")
         .title_alignment(Alignment::Center);
 
     let title_text = Line::from(Span::styled(

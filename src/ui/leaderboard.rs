@@ -116,7 +116,7 @@ fn render_tab_bar(f: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::DarkGray))
-        .title(" LEADERBOARD ")
+        .title(" [Esc] Dashboard | LEADERBOARD ")
         .title_alignment(Alignment::Center);
 
     let paragraph = Paragraph::new(Line::from(spans)).block(block);

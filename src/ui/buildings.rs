@@ -84,7 +84,7 @@ fn render_tab_bar(f: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::DarkGray))
-        .title(" BUILDINGS ")
+        .title(" [Esc] Dashboard | BUILDINGS ")
         .title_alignment(Alignment::Center);
 
     let paragraph = Paragraph::new(Line::from(spans)).block(block);
@@ -255,7 +255,7 @@ fn render_detail_panel(f: &mut Frame, app: &App, area: Rect) {
     )));
 
     // Effect description
-    let effect = describe_effect(bt, def);
+    let effect = describe_effect(bt, def, level);
     lines.push(Line::from(Span::styled(
         format!("  Effect: {}", effect),
         Style::default().fg(Color::Cyan),
@@ -316,47 +316,86 @@ fn render_detail_panel(f: &mut Frame, app: &App, area: Rect) {
 
 fn render_resource_bar(f: &mut Frame, app: &App, area: Rect) {
     let res = &app.state.resources;
-
-    let line = Line::from(vec![
-        Span::raw("  "),
-        Span::styled("\u{26A1} ", Style::default().fg(Color::Yellow)),
-        Span::styled(
-            format!("{} / {}", format_number(res.compute), format_number(res.max_compute)),
-            Style::default().fg(Color::White),
-        ),
-        Span::raw("   "),
-        Span::styled("\u{1F4E1} ", Style::default().fg(Color::Cyan)),
-        Span::styled(
-            format!("{} / {}", format_number(res.data), format_number(res.max_data)),
-            Style::default().fg(Color::White),
-        ),
-        Span::raw("   "),
-        Span::styled("\u{1F525} ", Style::default().fg(Color::Red)),
-        Span::styled(
-            format!("{:.1} / {:.1}", res.hype, res.max_hype),
-            Style::default().fg(Color::White),
-        ),
-    ]);
+    let narrow = area.width < 50;
 
     let block = Block::default()
-        .borders(Borders::ALL)
+        .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
         .border_style(Style::default().fg(Color::DarkGray));
 
-    let paragraph = Paragraph::new(line).block(block);
-    f.render_widget(paragraph, area);
+    if narrow {
+        // Compact: use short format with K suffix
+        let line = Line::from(vec![
+            Span::styled(" \u{26A1}", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                format!("{}/{}", fmt_short(res.compute), fmt_short(res.max_compute)),
+                Style::default().fg(Color::White),
+            ),
+            Span::raw(" "),
+            Span::styled("\u{1F4E1}", Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("{}/{}", fmt_short(res.data), fmt_short(res.max_data)),
+                Style::default().fg(Color::White),
+            ),
+            Span::raw(" "),
+            Span::styled("\u{1F525}", Style::default().fg(Color::Red)),
+            Span::styled(
+                format!("{:.0}/{:.0}", res.hype, res.max_hype),
+                Style::default().fg(Color::White),
+            ),
+        ]);
+        let paragraph = Paragraph::new(line).block(block);
+        f.render_widget(paragraph, area);
+    } else {
+        let line = Line::from(vec![
+            Span::raw("  "),
+            Span::styled("\u{26A1} ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                format!("{} / {}", format_number(res.compute), format_number(res.max_compute)),
+                Style::default().fg(Color::White),
+            ),
+            Span::raw("   "),
+            Span::styled("\u{1F4E1} ", Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("{} / {}", format_number(res.data), format_number(res.max_data)),
+                Style::default().fg(Color::White),
+            ),
+            Span::raw("   "),
+            Span::styled("\u{1F525} ", Style::default().fg(Color::Red)),
+            Span::styled(
+                format!("{:.1} / {:.1}", res.hype, res.max_hype),
+                Style::default().fg(Color::White),
+            ),
+        ]);
+        let paragraph = Paragraph::new(line).block(block);
+        f.render_widget(paragraph, area);
+    }
 }
 
 fn render_help(f: &mut Frame, area: Rect) {
-    let help = Line::from(vec![
-        Span::styled(" [\u{2191}\u{2193}]", Style::default().fg(Color::Yellow)),
-        Span::styled(" Navigate  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("[Tab]", Style::default().fg(Color::Yellow)),
-        Span::styled(" Category  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("[Enter]", Style::default().fg(Color::Yellow)),
-        Span::styled(" Build  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("[Esc]", Style::default().fg(Color::Yellow)),
-        Span::styled(" Back", Style::default().fg(Color::DarkGray)),
-    ]);
+    let narrow = area.width < 50;
+    let help = if narrow {
+        Line::from(vec![
+            Span::styled("[\u{2191}\u{2193}]", Style::default().fg(Color::Yellow)),
+            Span::styled("Nav ", Style::default().fg(Color::DarkGray)),
+            Span::styled("[Tab]", Style::default().fg(Color::Yellow)),
+            Span::styled("Cat ", Style::default().fg(Color::DarkGray)),
+            Span::styled("[Enter]", Style::default().fg(Color::Yellow)),
+            Span::styled("Build ", Style::default().fg(Color::DarkGray)),
+            Span::styled("[Esc]", Style::default().fg(Color::Yellow)),
+            Span::styled("Back", Style::default().fg(Color::DarkGray)),
+        ])
+    } else {
+        Line::from(vec![
+            Span::styled(" [\u{2191}\u{2193}]", Style::default().fg(Color::Yellow)),
+            Span::styled(" Navigate  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("[Tab]", Style::default().fg(Color::Yellow)),
+            Span::styled(" Category  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("[Enter]", Style::default().fg(Color::Yellow)),
+            Span::styled(" Build  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("[Esc]", Style::default().fg(Color::Yellow)),
+            Span::styled(" Back", Style::default().fg(Color::DarkGray)),
+        ])
+    };
 
     let paragraph = Paragraph::new(help).alignment(Alignment::Center);
     f.render_widget(paragraph, area);
@@ -379,17 +418,40 @@ fn get_lock_reason(def: &BuildingDef, state: &misanthropic::state::GameState) ->
 }
 
 /// Describe what a building does, for the detail panel.
-fn describe_effect(bt: &BuildingType, def: &BuildingDef) -> String {
+/// Shows the concrete gain for the next level.
+fn describe_effect(bt: &BuildingType, def: &BuildingDef, level: u8) -> String {
     use BuildingType::*;
+    let next = level + 1;
     match bt {
-        CpuCore => "+500 Compute storage per level".to_string(),
-        RamBank => "+200 Data storage per level".to_string(),
-        GpuRig => "+300 Hype storage per level".to_string(),
-        GpuCluster => "-10% research time per level (multiplicative)".to_string(),
-        Datacenter => "+15% global production per level".to_string(),
+        CpuCore | RamBank | GpuRig => {
+            let resource_name = match bt {
+                CpuCore => "Compute",
+                RamBank => "Data",
+                _ => "Hype",
+            };
+            if level == 0 {
+                let gain = misanthropic::economy::storage_bonus(bt, 1);
+                format!("Lv.1: +{} {} storage", format_number(gain), resource_name)
+            } else if next <= def.max_level {
+                let current = misanthropic::economy::storage_bonus(bt, level);
+                let after = misanthropic::economy::storage_bonus(bt, next);
+                format!("Next: +{} {} storage", format_number(after - current), resource_name)
+            } else {
+                format!("{} storage (maxed)", resource_name)
+            }
+        }
+        GpuCluster => {
+            let mult = misanthropic::economy::research_time_multiplier(next.min(def.max_level));
+            format!("Research time x{:.2} at next level", mult)
+        }
+        Datacenter => {
+            let mult = misanthropic::economy::datacenter_production_multiplier(next.min(def.max_level));
+            format!("All production x{:.2} at next level", mult)
+        }
         QuantumCore => "Endgame compute multiplier".to_string(),
         _ if def.category == BuildingCategory::Propaganda => {
-            format!("+{:.0} Hype/h base (scales per level)", def.base_hype_rate)
+            let hype = def.hype_at_level(next.min(def.max_level));
+            format!("{:.0} Hype/h at next level", hype)
         }
         _ if def.category == BuildingCategory::Defense => {
             "Defense strength in PvP combat".to_string()
@@ -402,9 +464,9 @@ fn describe_effect(bt: &BuildingType, def: &BuildingDef) -> String {
 fn describe_current_bonus(bt: &BuildingType, def: &BuildingDef, level: u8) -> String {
     use BuildingType::*;
     match bt {
-        CpuCore => format!("+{} Compute storage", 500 * level as u64),
-        RamBank => format!("+{} Data storage", 200 * level as u64),
-        GpuRig => format!("+{} Hype storage", 300 * level as u64),
+        CpuCore => format!("+{} Compute storage", misanthropic::economy::storage_bonus(bt, level)),
+        RamBank => format!("+{} Data storage", misanthropic::economy::storage_bonus(bt, level)),
+        GpuRig => format!("+{} Hype storage", misanthropic::economy::storage_bonus(bt, level)),
         GpuCluster => {
             let mult = misanthropic::economy::research_time_multiplier(level);
             format!("{:.0}% research time", mult * 100.0)
@@ -421,6 +483,19 @@ fn describe_current_bonus(bt: &BuildingType, def: &BuildingDef, level: u8) -> St
             format!("Defense Lv.{}", level)
         }
         _ => String::new(),
+    }
+}
+
+/// Format a number in short form: 1.2K, 45K, 1.2M etc.
+fn fmt_short(n: u64) -> String {
+    if n >= 1_000_000 {
+        format!("{:.1}M", n as f64 / 1_000_000.0)
+    } else if n >= 10_000 {
+        format!("{:.0}K", n as f64 / 1_000.0)
+    } else if n >= 1_000 {
+        format!("{:.1}K", n as f64 / 1_000.0)
+    } else {
+        n.to_string()
     }
 }
 

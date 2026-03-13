@@ -203,9 +203,9 @@ impl Default for Resources {
             compute: 0,
             data: 0,
             hype: 0.0,
-            max_compute: 500,  // base storage (1 CPU Core equivalent)
-            max_data: 200,
-            max_hype: 100.0,
+            max_compute: 2500,  // base storage
+            max_data: 500,
+            max_hype: 200.0,
         }
     }
 }
@@ -561,17 +561,21 @@ pub fn fork_compute_multiplier(fork_count: u32) -> f64 {
 }
 
 /// Storage bonus from building level.
-/// CPU Core: +500 compute storage per level.
-/// RAM Bank: +200 data storage per level.
-/// GPU Rig: +300 hype storage per level.
-pub fn storage_bonus(building_type: &str, level: u8) -> u64 {
-    let per_level = match building_type {
-        "CpuCore" => 500,
-        "RamBank" => 200,
-        "GpuRig" => 300,
-        _ => 0,
+/// Scales exponentially (x1.8) to match building cost scaling,
+/// so the storage cap always stays ahead of the next upgrade cost.
+/// CPU Core: base 800 compute. RAM Bank: base 300 data. GPU Rig: base 400 hype.
+pub fn storage_bonus(building_type: &BuildingType, level: u8) -> u64 {
+    if level == 0 { return 0; }
+    let base = match building_type {
+        BuildingType::CpuCore => 800,
+        BuildingType::RamBank => 300,
+        BuildingType::GpuRig => 400,
+        _ => return 0,
     };
-    per_level * level as u64
+    // Cumulative: sum of base * 1.8^(i-1) for i=1..=level
+    (0..level as i32)
+        .map(|i| (base as f64 * 1.8_f64.powi(i)) as u64)
+        .sum()
 }
 
 /// GPU Cluster: research time reduction. -10% per level (multiplicative).
@@ -2328,18 +2332,19 @@ git commit -m "feat: backend — Cloudflare Workers API with D1, Hono routes, Ru
 - Modify: `src/ui/dashboard.rs`
 - Modify: `src/state.rs`
 
-Implement the 4-step contextual tutorial from the GDD:
-1. "Build your first CPU Core" — highlight Build button
-2. "Your host is coding. Compute flowing in." — on first token income
-3. "Build a Bot Farm to generate Hype" — after Social Engineering researched
-4. "Target Silicon Valley" — after first propaganda building
+Implement the 5-step contextual tutorial from the GDD:
+1. Explain resource sources (Compute = tokens, Data = tool calls) + build CPU Core
+2. Build a Ram Bank to store Data for research
+3. Resources flow in as your host codes
+4. Research Social Engineering to unlock propaganda
+5. Build a Bot Farm for Hype, then Combat
 
-Track tutorial step in GameState. Each step shows a highlighted callout on the dashboard.
+Track tutorial step in GameState (0-4 active, 5+ = done). Each step shows a highlighted callout on the dashboard. Storage is recalculated on save load.
 
 **Step 2: Commit**
 
 ```bash
-git commit -m "feat: tutorial — 4-step contextual onboarding"
+git commit -m "feat: tutorial — 5-step contextual onboarding with resource explanations"
 ```
 
 ---

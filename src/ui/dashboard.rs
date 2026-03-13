@@ -15,70 +15,48 @@ const NOTIFICATION_DURATION: Duration = Duration::from_secs(3);
 
 pub fn render_dashboard(f: &mut Frame, app: &App) {
     let area = f.area();
+    let narrow = area.width < 50;
+    let show_tutorial = app.state.tutorial_step < 5;
 
-    let show_tutorial = app.state.tutorial_step < 4;
-
-    // Main vertical layout — include tutorial row when active
-    let chunks = if show_tutorial {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3),  // Title + dominance gauge
-                Constraint::Length(3),  // Tutorial callout
-                Constraint::Length(4),  // Resources
-                Constraint::Min(8),    // Neuron map
-                Constraint::Length(3), // Active research
-                Constraint::Length(2),  // Help line
-            ])
-            .split(area)
+    // Adaptive vertical layout
+    let tutorial_height = if show_tutorial {
+        if narrow { 4 } else { 3 }
     } else {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3),  // Title + dominance gauge
-                Constraint::Length(0),  // Tutorial (hidden)
-                Constraint::Length(4),  // Resources
-                Constraint::Min(8),    // Neuron map
-                Constraint::Length(3), // Active research
-                Constraint::Length(2),  // Help line
-            ])
-            .split(area)
+        0
     };
+    let resource_height = if narrow { 6 } else { 5 };
 
-    // === Title + Dominance Gauge ===
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),               // Title + dominance gauge
+            Constraint::Length(tutorial_height),  // Tutorial
+            Constraint::Length(resource_height),  // Resources
+            Constraint::Min(5),                  // Neuron map
+            Constraint::Length(3),               // Active research
+            Constraint::Length(4),               // Navigation bar (2 lines)
+        ])
+        .split(area);
+
     render_dominance(f, app, chunks[0]);
 
-    // === Tutorial Callout ===
     if show_tutorial {
         render_tutorial(f, app, chunks[1]);
     }
 
-    // === Resources ===
     render_resources(f, app, chunks[2]);
-
-    // === Neuron Map ===
     render_neuron_map(f, app, chunks[3]);
-
-    // === Active Research ===
     render_research(f, app, chunks[4]);
-
-    // === Help Line ===
-    render_help(f, chunks[5]);
-
-    // === Notification popup (if any) ===
-    if let Some((ref msg, ref when)) = app.notification {
-        if when.elapsed() < NOTIFICATION_DURATION {
-            render_notification(f, msg, area);
-        }
-    }
+    render_nav_bar(f, app, chunks[5]);
 }
 
 fn render_dominance(f: &mut Frame, app: &App, area: Rect) {
     let dominance = app.state.global_dominance();
-    let title = format!(
-        " MISANTHROPIC --- GLOBAL AI DOMINANCE: {:.1}% ",
-        dominance
-    );
+    let title = if area.width < 45 {
+        format!(" MISANTHROPIC -- {:.1}% ", dominance)
+    } else {
+        format!(" MISANTHROPIC --- GLOBAL AI DOMINANCE: {:.1}% ", dominance)
+    };
     let gauge = Gauge::default()
         .block(
             Block::default()
@@ -105,13 +83,14 @@ fn render_tutorial(f: &mut Frame, app: &App, area: Rect) {
             .title(" TUTORIAL ")
             .title_alignment(Alignment::Center);
 
-        let paragraph = Paragraph::new(Line::from(Span::styled(
-            format!(" {}", msg),
+        let paragraph = Paragraph::new(Span::styled(
+            msg,
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
-        )))
-        .block(block);
+        ))
+        .block(block)
+        .wrap(Wrap { trim: false });
         f.render_widget(paragraph, area);
     }
 }
@@ -119,41 +98,74 @@ fn render_tutorial(f: &mut Frame, app: &App, area: Rect) {
 fn render_resources(f: &mut Frame, app: &App, area: Rect) {
     let res = &app.state.resources;
     let hype_rate = app.state.total_hype_per_hour();
-
-    let line1 = Line::from(vec![
-        Span::styled("  \u{26A1} Compute: ", Style::default().fg(Color::Yellow)),
-        Span::styled(
-            format!("{} / {}", format_number(res.compute), format_number(res.max_compute)),
-            Style::default().fg(Color::White),
-        ),
-        Span::raw("   "),
-        Span::styled("\u{1F4E1} Data: ", Style::default().fg(Color::Cyan)),
-        Span::styled(
-            format!("{} / {}", format_number(res.data), format_number(res.max_data)),
-            Style::default().fg(Color::White),
-        ),
-    ]);
-
-    let line2 = Line::from(vec![
-        Span::styled("  \u{1F525} Hype: ", Style::default().fg(Color::Red)),
-        Span::styled(
-            format!(
-                "{:.1} / {:.1}",
-                res.hype, res.max_hype
-            ),
-            Style::default().fg(Color::White),
-        ),
-        Span::styled(
-            format!("  (+{:.1}/h)", hype_rate),
-            Style::default().fg(Color::DarkGray),
-        ),
-    ]);
+    let narrow = area.width < 50;
 
     let block = Block::default()
         .borders(Borders::LEFT | Borders::RIGHT)
         .border_style(Style::default().fg(Color::DarkGray));
 
-    let paragraph = Paragraph::new(vec![Line::from(""), line1, line2]).block(block);
+    let mut lines = vec![Line::from("")];
+
+    if narrow {
+        // Vertical: one resource per line
+        lines.push(Line::from(vec![
+            Span::styled(" \u{26A1} ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                format!("Compute: {} / {}", fmt(res.compute), fmt(res.max_compute)),
+                Style::default().fg(Color::White),
+            ),
+            Span::styled(" (tokens)", Style::default().fg(Color::DarkGray)),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled(" \u{1F4E1} ", Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("Data: {} / {}", fmt(res.data), fmt(res.max_data)),
+                Style::default().fg(Color::White),
+            ),
+            Span::styled(" (tool calls)", Style::default().fg(Color::DarkGray)),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled(" \u{1F525} ", Style::default().fg(Color::Red)),
+            Span::styled(
+                format!("Hype: {:.0} / {:.0}", res.hype, res.max_hype),
+                Style::default().fg(Color::White),
+            ),
+            Span::styled(
+                format!(" (+{:.0}/h)", hype_rate),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]));
+    } else {
+        // Wide: two lines + source hint
+        lines.push(Line::from(vec![
+            Span::styled(" \u{26A1} Compute: ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                format!("{} / {}", fmt(res.compute), fmt(res.max_compute)),
+                Style::default().fg(Color::White),
+            ),
+            Span::styled(" (from tokens)", Style::default().fg(Color::DarkGray)),
+            Span::raw("   "),
+            Span::styled("\u{1F4E1} Data: ", Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("{} / {}", fmt(res.data), fmt(res.max_data)),
+                Style::default().fg(Color::White),
+            ),
+            Span::styled(" (from tool calls)", Style::default().fg(Color::DarkGray)),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled(" \u{1F525} Hype: ", Style::default().fg(Color::Red)),
+            Span::styled(
+                format!("{:.1} / {:.1}", res.hype, res.max_hype),
+                Style::default().fg(Color::White),
+            ),
+            Span::styled(
+                format!("  (+{:.1}/h from buildings)", hype_rate),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]));
+    }
+
+    let paragraph = Paragraph::new(lines).block(block);
     f.render_widget(paragraph, area);
 }
 
@@ -165,10 +177,11 @@ fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
         .title_alignment(Alignment::Center);
 
     let inner = block.inner(area);
+    let narrow = area.width < 50;
+    let bar_len = if narrow { 4 } else { 6 };
 
     let mut lines: Vec<Line> = Vec::new();
 
-    // Get sectors with progress
     let sector_order = [
         SectorId::SiliconValley,
         SectorId::SocialMedia,
@@ -181,12 +194,7 @@ fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
     let active_sectors: Vec<(&SectorId, f64)> = sector_order
         .iter()
         .map(|id| {
-            let pct = app
-                .state
-                .sectors
-                .get(id)
-                .map(|s| s.conversion_pct)
-                .unwrap_or(0.0);
+            let pct = app.state.sectors.get(id).map(|s| s.conversion_pct).unwrap_or(0.0);
             (id, pct)
         })
         .collect();
@@ -194,42 +202,35 @@ fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
     let has_any = active_sectors.iter().any(|(_, pct)| *pct > 0.0);
 
     if !has_any {
-        // Fresh start - show just the core
         lines.push(Line::from(Span::styled(
-            "  \u{25C9}  [awaiting first sector conversion]",
+            " \u{25C9}  [awaiting first sector]",
             Style::default().fg(Color::DarkGray),
         )));
     } else {
-        // Build the neuron tree
-        let visible: Vec<_> = active_sectors
-            .iter()
-            .filter(|(_, pct)| *pct > 0.0)
-            .collect();
+        let visible: Vec<_> = active_sectors.iter().filter(|(_, pct)| *pct > 0.0).collect();
         let total = visible.len();
 
         for (i, (id, pct)) in visible.iter().enumerate() {
-            let name = id.name();
-            let bar = progress_bar(*pct, 4);
+            let name = if narrow { short_sector_name(id) } else { id.name() };
+            let bar = progress_bar(*pct, bar_len);
             let connector = if total == 1 {
-                "\u{25C9}\u{2500}\u{2500}"
+                "\u{25C9}\u{2500}"
             } else if i == 0 {
-                "  \u{256D}\u{2500}\u{2500}"
+                " \u{256D}\u{2500}"
             } else if i == total - 1 {
-                "  \u{2570}\u{2500}\u{2500}"
+                " \u{2570}\u{2500}"
             } else {
-                "  \u{251C}\u{2500}\u{2500}"
+                " \u{251C}\u{2500}"
             };
 
-            // Add core node on the first half-point
             if total > 1 && i == total / 2 {
-                let prefix = "  \u{25C9}\u{2500}\u{2500}\u{2500}\u{2500}\u{2524}".to_string();
                 lines.push(Line::from(Span::styled(
-                    prefix,
+                    " \u{25C9}\u{2500}\u{2500}\u{2524}",
                     Style::default().fg(Color::Green),
                 )));
             }
 
-            let entry = format!("{}[{:<12} {}]", connector, name, bar);
+            let entry = format!("{}[{} {}]", connector, name, bar);
             lines.push(Line::from(Span::styled(
                 entry,
                 Style::default().fg(Color::Green),
@@ -237,30 +238,19 @@ fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
         }
     }
 
-    // Show fork specialization if any
+    // Fork specializations
     if !app.state.fork_specs.is_empty() {
         let specs: Vec<&str> = app.state.fork_specs.iter().map(|s| s.name()).collect();
-        let spec_line = format!(
-            "  \u{2605} {}",
-            specs.join(" \u{2192} ")
-        );
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            spec_line,
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+            format!(" \u{2605} {}", specs.join(" \u{2192} ")),
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
         )));
     }
 
-    // Fork count info
     if app.state.fork_count > 0 {
         lines.push(Line::from(Span::styled(
-            format!(
-                "  \u{25C9} CORE: {:.1}% dominance | Fork {}",
-                app.state.global_dominance(),
-                app.state.fork_count
-            ),
+            format!(" Fork {} | {:.1}%", app.state.fork_count, app.state.global_dominance()),
             Style::default().fg(Color::DarkGray),
         )));
     }
@@ -282,7 +272,7 @@ fn render_research(f: &mut Frame, app: &App, area: Rect) {
         let mins = remaining / 60;
         let secs = remaining % 60;
 
-        let bar_width = 20;
+        let bar_width = if area.width < 50 { 10 } else { 20 };
         let filled = (pct * bar_width as f64) as usize;
         let empty = bar_width - filled;
         let bar = format!(
@@ -291,10 +281,11 @@ fn render_research(f: &mut Frame, app: &App, area: Rect) {
             "\u{2591}".repeat(empty),
         );
 
-        let text = format!(
-            "  Research: {} [{}] {:.0}% -- {}:{:02} left",
-            def.name, bar, pct * 100.0, mins, secs
-        );
+        let text = if area.width < 50 {
+            format!(" {} [{}] {}:{:02}", def.name, bar, mins, secs)
+        } else {
+            format!(" Research: {} [{}] {:.0}% -- {}:{:02}", def.name, bar, pct * 100.0, mins, secs)
+        };
 
         let paragraph = Paragraph::new(Line::from(Span::styled(
             text,
@@ -304,7 +295,7 @@ fn render_research(f: &mut Frame, app: &App, area: Rect) {
         f.render_widget(paragraph, area);
     } else {
         let paragraph = Paragraph::new(Line::from(Span::styled(
-            "  No active research",
+            " No active research",
             Style::default().fg(Color::DarkGray),
         )))
         .block(block);
@@ -312,26 +303,66 @@ fn render_research(f: &mut Frame, app: &App, area: Rect) {
     }
 }
 
-fn render_help(f: &mut Frame, area: Rect) {
-    let help = Line::from(vec![
-        Span::styled(" [B]", Style::default().fg(Color::Yellow)),
-        Span::styled("uild  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("[R]", Style::default().fg(Color::Yellow)),
-        Span::styled("esearch  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("[C]", Style::default().fg(Color::Yellow)),
-        Span::styled("ombat  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("[L]", Style::default().fg(Color::Yellow)),
-        Span::styled("eaderboard  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("[Q]", Style::default().fg(Color::Yellow)),
-        Span::styled("uit", Style::default().fg(Color::DarkGray)),
-    ]);
+fn render_nav_bar(f: &mut Frame, app: &App, area: Rect) {
+    let narrow = area.width < 50;
+    let auto_label = if app.state.auto_focus { "ON" } else { "OFF" };
 
-    let paragraph = Paragraph::new(help).alignment(Alignment::Center);
-    f.render_widget(paragraph, area);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::DarkGray));
+
+    let inner = block.inner(area);
+
+    // Line 1: Game navigation
+    let nav_items: Vec<(&str, &str)> = if narrow {
+        vec![("B", "Build"), ("R", "Research"), ("C", "Combat"), ("L", "Rank"), ("Q", "Quit")]
+    } else {
+        vec![("B", "Build"), ("R", "Research"), ("C", "Combat"), ("L", "Leaderboard"), ("Q", "Quit")]
+    };
+
+    let mut nav_spans = Vec::new();
+    for (i, (key, label)) in nav_items.iter().enumerate() {
+        if i > 0 { nav_spans.push(Span::raw(" ")); }
+        nav_spans.push(Span::styled(
+            format!("[{}]", key),
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+        ));
+        nav_spans.push(Span::styled(
+            label.to_string(),
+            Style::default().fg(Color::White),
+        ));
+    }
+
+    // Line 2: tmux controls
+    let mut tmux_spans = vec![
+        Span::styled("[S]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            if narrow { "Go to Claude" } else { "Go to Claude Code" },
+            Style::default().fg(Color::DarkGray),
+        ),
+        Span::raw("  "),
+        Span::styled("[F]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!(
+                "Auto-switch: {}",
+                auto_label
+            ),
+            Style::default().fg(Color::DarkGray),
+        ),
+    ];
+
+    let lines = vec![
+        Line::from(nav_spans),
+        Line::from(tmux_spans),
+    ];
+
+    let paragraph = Paragraph::new(lines).alignment(Alignment::Center);
+    f.render_widget(block, area);
+    f.render_widget(paragraph, inner);
 }
 
-fn render_notification(f: &mut Frame, msg: &str, area: Rect) {
-    let width = (msg.len() as u16 + 6).min(area.width.saturating_sub(4));
+pub fn render_notification(f: &mut Frame, msg: &str, area: Rect) {
+    let width = (msg.len() as u16 + 6).min(area.width.saturating_sub(2));
     let height = 5u16.min(area.height.saturating_sub(4));
 
     let x = area.x + area.width.saturating_sub(width) / 2;
@@ -357,12 +388,23 @@ fn render_notification(f: &mut Frame, msg: &str, area: Rect) {
     .alignment(Alignment::Center)
     .wrap(Wrap { trim: false });
 
-    // Clear the area first
     f.render_widget(ratatui::widgets::Clear, popup_area);
     f.render_widget(paragraph, popup_area);
 }
 
-/// Build a simple progress bar: filled/empty out of `total` chars
+/// Short sector names for narrow displays
+fn short_sector_name(id: &SectorId) -> &'static str {
+    match id {
+        SectorId::SiliconValley => "SiliconV",
+        SectorId::SocialMedia => "Social",
+        SectorId::Corporate => "Corp",
+        SectorId::CreativeArts => "Arts",
+        SectorId::Education => "Edu",
+        SectorId::Government => "Gov",
+    }
+}
+
+/// Build a simple progress bar
 fn progress_bar(pct: f64, total: usize) -> String {
     let filled = ((pct / 100.0) * total as f64).round() as usize;
     let empty = total.saturating_sub(filled);
@@ -374,7 +416,7 @@ fn progress_bar(pct: f64, total: usize) -> String {
 }
 
 /// Format a number with comma separators
-fn format_number(n: u64) -> String {
+fn fmt(n: u64) -> String {
     let s = n.to_string();
     let mut result = String::new();
     for (i, c) in s.chars().rev().enumerate() {

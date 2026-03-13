@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use std::process::Command;
 use std::{fs, process, thread};
 
 use chrono::Utc;
@@ -49,6 +50,7 @@ fn main() -> io::Result<()> {
                     s.last_hype_tick = now;
                 }
                 s.last_active = now;
+                s.recalculate_storage();
                 s
             }
             Err(e) => {
@@ -59,6 +61,14 @@ fn main() -> io::Result<()> {
     } else {
         GameState::new()
     };
+
+    // Sync auto_focus flag file with save state
+    let flag = std::path::Path::new("/tmp/misanthropic-no-autofocus");
+    if state.auto_focus {
+        let _ = fs::remove_file(flag);
+    } else {
+        let _ = fs::write(flag, "");
+    }
 
     // Initial save (creates directory if needed)
     let _ = persistence::save_game(&state, &save_path);
@@ -129,7 +139,8 @@ fn run_loop(
             return Ok(());
         }
 
-        // Check signals
+        // Check signals (tmux switching is handled by Claude Code hooks,
+        // not here — hooks check /tmp/misanthropic-no-autofocus flag)
         if sigusr1.swap(false, Ordering::Relaxed) {
             app.is_active = true;
         }
@@ -237,6 +248,15 @@ fn render(frame: &mut ratatui::Frame, app: &App) {
         Screen::PvP => ui::combat::render_pvp_placeholder(frame),
         Screen::Leaderboard => ui::leaderboard::render_leaderboard(frame, app),
     }
+
+    // Notification popup overlay on all screens (except Boot)
+    if app.screen != Screen::Boot {
+        if let Some((ref msg, ref when)) = app.notification {
+            if when.elapsed() < std::time::Duration::from_secs(3) {
+                ui::dashboard::render_notification(frame, msg, frame.area());
+            }
+        }
+    }
 }
 
 enum KeyAction {
@@ -254,7 +274,31 @@ const SECTOR_ORDER: [SectorId; 6] = [
     SectorId::Government,
 ];
 
+fn switch_tmux_pane() {
+    // Try to switch to the Claude Code pane using saved pane ID
+    let claude_pane = fs::read_to_string("/tmp/misanthropic-claude-pane")
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    if !claude_pane.is_empty() {
+        let _ = Command::new("tmux")
+            .args(["select-pane", "-t", &claude_pane])
+            .output();
+    } else {
+        // Fallback: toggle to next pane
+        let _ = Command::new("tmux").args(["select-pane", "-t", ":.+"]).output();
+    }
+}
+
 fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
+    // Global shortcut: S to switch tmux pane (except in Boot)
+    if app.screen != Screen::Boot {
+        if let KeyCode::Char('s') | KeyCode::Char('S') = code {
+            switch_tmux_pane();
+            return KeyAction::Continue;
+        }
+    }
+
     match app.screen {
         Screen::Boot => {
             // Any key advances boot or skips to end
@@ -270,6 +314,19 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
         }
         Screen::Dashboard => match code {
             KeyCode::Char('q') | KeyCode::Char('Q') => KeyAction::Quit,
+            KeyCode::Char('f') | KeyCode::Char('F') => {
+                app.state.auto_focus = !app.state.auto_focus;
+                // Sync with hook flag file
+                let flag = std::path::Path::new("/tmp/misanthropic-no-autofocus");
+                if app.state.auto_focus {
+                    let _ = fs::remove_file(flag);
+                    app.set_status("Auto-switch ON: game shows while Claude works".to_string());
+                } else {
+                    let _ = fs::write(flag, "");
+                    app.set_status("Auto-switch OFF: panes stay put".to_string());
+                }
+                KeyAction::Continue
+            }
             KeyCode::Char('b') | KeyCode::Char('B') => {
                 app.screen = Screen::Buildings;
                 app.selected_index = 0;

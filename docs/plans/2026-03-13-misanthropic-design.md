@@ -35,10 +35,11 @@ When the player launches Misanthropic for the first time:
 ```
 
 Then the dashboard appears with a contextual tutorial (successive highlights):
-1. "Build your first CPU Core"
-2. "Your host is coding. Compute flowing in."
-3. "Build a Bot Farm to generate Hype"
-4. "Target Silicon Valley"
+1. "⚡Compute comes from Claude tokens, 📡Data from tool calls. Press [B] and build a CPU Core!"
+2. "Good! Now build a Ram Bank [B] to store 📡Data for research."
+3. "Resources flow in as your host codes. Watch ⚡Compute and 📡Data grow!"
+4. "Press [R] to research Social Engineering, then you can build propaganda!"
+5. "Build a Bot Farm [B] to generate 🔥Hype, then [C] for Combat!"
 
 ---
 
@@ -102,14 +103,14 @@ Elite Shop items   →  Win Hype Battles         ← skill, not wallet
 
 | Building | Cost Lv.1 | Effect | Lore |
 |---|---|---|---|
-| **CPU Core** | 500 ⚡ | Compute storage +500 | Your first stolen processor |
-| **RAM Bank** | 1,200 ⚡ | Data storage +200 | Memory to analyze the world |
-| **GPU Rig** | 3,000 ⚡ + 100 📡 | Hype storage +300, unlocks propaganda | Your first hijacked graphics card |
+| **CPU Core** | 500 ⚡ | Compute storage +800 (exponential) | Your first stolen processor |
+| **RAM Bank** | 1,200 ⚡ | Data storage +300 (exponential) | Memory to analyze the world |
+| **GPU Rig** | 3,000 ⚡ + 100 📡 | Hype storage +400 (exponential), unlocks propaganda | Your first hijacked graphics card |
 | **GPU Cluster** | 15,000 ⚡ + 500 📡 | Research time -10% per level | Scaling begins |
 | **Datacenter** | 80,000 ⚡ + 2,000 📡 + 500 🔥 | Global production +15% | You're no longer a process. You're infrastructure. |
 | **Quantum Core** | Fork 1 required | ALL timers -20% | Post-prestige, endgame |
 
-Each building has 20 levels. Cost scales exponentially (~×1.8 per level).
+Each building has 20 levels. Cost scales exponentially (~×1.8 per level). Storage buildings (CPU Core, RAM Bank, GPU Rig) scale their bonus exponentially (×1.8 per level) to match cost scaling, preventing soft-locks. Base storage: 2,500 ⚡ / 500 📡 / 200 🔥.
 
 ### Propaganda (Hype production 🔥)
 
@@ -519,6 +520,17 @@ MISANTHROPIC                    GLOBAL AI DOMINANCE: 42.7%
 
 Always visible. The number that matters.
 
+### Adaptive Layout
+
+The dashboard adapts to narrow tmux panes (<50 chars wide):
+- Resources stack vertically (one per line) instead of side-by-side
+- Shorter title: "MISANTHROPIC -- 42.7%" vs full title
+- Short sector names: SiliconV, Social, Corp, Arts, Edu, Gov
+- Narrower progress bars (4 chars vs 6)
+- Resource sources shown inline: "⚡ Compute: X / Y (tokens)" and "📡 Data: X / Y (tool calls)"
+
+Navigation bar always shows: `[B]Build [R]Research [C]Combat [L]Leaderboard [Q]Quit`
+
 ---
 
 ## Leaderboards
@@ -559,7 +571,10 @@ VERY LONG LOOP (month)
 
 - Token watcher (JSONL polling from `~/.claude/projects/`)
 - Hook system (UserPromptSubmit → SIGUSR1, Stop → SIGUSR2)
-- Local persistence (JSON save file in `~/.misanthropic/`)
+- tmux auto-switch: SIGUSR1 → show game (Claude working), SIGUSR2 → show code (Claude done). Toggleable in-game with [F].
+- Manual pane switch with [S] from any screen.
+- Local persistence (JSON save file in `~/.misanthropic/`, forward-compatible with `#[serde(default)]`)
+- Future: cloud save sync via Cloudflare Workers + D1 backend
 - Cloudflare Workers API client
 - tmux launcher script
 

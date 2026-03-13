@@ -206,7 +206,7 @@ fn render_pve_title(f: &mut Frame, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::DarkGray))
-        .title(" PvE TOWER ")
+        .title(" [Esc] Dashboard | PvE TOWER ")
         .title_alignment(Alignment::Center);
 
     let text = Line::from(Span::styled(

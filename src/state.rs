@@ -112,10 +112,18 @@ pub struct GameState {
     pub last_active: DateTime<Utc>,
     pub last_hype_tick: DateTime<Utc>,
     pub boot_sequence_done: bool,
+    #[serde(default)]
     pub tutorial_step: u8,
+    #[serde(default = "default_compute_multiplier")]
     pub compute_multiplier: f64,  // from Fork bonuses
+    #[serde(default)]
     pub streak_days: u32,
+    #[serde(default = "default_true")]
+    pub auto_focus: bool,
 }
+
+fn default_true() -> bool { true }
+fn default_compute_multiplier() -> f64 { 1.0 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActiveResearch {
@@ -184,6 +192,7 @@ impl GameState {
             tutorial_step: 0,
             compute_multiplier: 1.0,
             streak_days: 0,
+            auto_focus: true,
         }
     }
 
@@ -392,9 +401,10 @@ impl GameState {
     ///
     /// Steps:
     ///   0 → 1: first CPU Core built
-    ///   1 → 2: first token income (lifetime_tokens > 0)
-    ///   2 → 3: SocialEngineering researched
-    ///   3 → 4: first Bot Farm built (tutorial complete)
+    ///   1 → 2: first Ram Bank built
+    ///   2 → 3: first token income (lifetime_tokens > 0)
+    ///   3 → 4: SocialEngineering researched
+    ///   4 → 5: first Bot Farm built (tutorial complete)
     pub fn check_tutorial_advancement(&mut self) {
         match self.tutorial_step {
             0 => {
@@ -403,18 +413,23 @@ impl GameState {
                 }
             }
             1 => {
-                if self.lifetime_tokens > 0 {
+                if self.building_level(&BuildingType::RamBank) >= 1 {
                     self.tutorial_step = 2;
                 }
             }
             2 => {
-                if self.has_research(&ResearchId::SocialEngineering) {
+                if self.lifetime_tokens > 0 {
                     self.tutorial_step = 3;
                 }
             }
             3 => {
-                if self.building_level(&BuildingType::BotFarm) >= 1 {
+                if self.has_research(&ResearchId::SocialEngineering) {
                     self.tutorial_step = 4;
+                }
+            }
+            4 => {
+                if self.building_level(&BuildingType::BotFarm) >= 1 {
+                    self.tutorial_step = 5;
                 }
             }
             _ => {} // tutorial complete, nothing to do
@@ -424,10 +439,11 @@ impl GameState {
     /// Return the current tutorial message, or None if the tutorial is complete.
     pub fn tutorial_message(&self) -> Option<&'static str> {
         match self.tutorial_step {
-            0 => Some("\u{25BA} TUTORIAL: Press [B] to open Buildings, then build your first CPU Core."),
-            1 => Some("\u{25BA} TUTORIAL: Your host is coding. Compute is flowing in from Claude Code tokens!"),
-            2 => Some("\u{25BA} TUTORIAL: Start researching Social Engineering [R], then build a Bot Farm."),
-            3 => Some("\u{25BA} TUTORIAL: Press [C] for Combat, then target Silicon Valley!"),
+            0 => Some("\u{25BA} Your host uses Claude Code. 100 tokens = 1\u{26A1}Compute. Tool calls = \u{1F4E1}Data. Press [B] \u{2192} build CPU Core!"),
+            1 => Some("\u{25BA} CPU online! Build a Ram Bank [B] to store \u{1F4E1}Data \u{2014} you'll need it for research."),
+            2 => Some("\u{25BA} Your host is coding \u{2014} \u{26A1}Compute and \u{1F4E1}Data flow in. Spread AI across the planet!"),
+            3 => Some("\u{25BA} Got Data! Press [R] \u{2192} research Social Engineering to unlock propaganda buildings."),
+            4 => Some("\u{25BA} Build a Bot Farm [B] for \u{1F525}Hype, then [C] \u{2192} Combat to conquer sectors!"),
             _ => None,
         }
     }
