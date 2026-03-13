@@ -155,7 +155,7 @@ fn render_building_list(f: &mut Frame, app: &App, area: Rect) {
             } else {
                 let mut parts = Vec::new();
                 if cost.compute > 0 {
-                    parts.push(format!("\u{26A1} {}", format_number(cost.compute)));
+                    parts.push(format!("${}", format_number(cost.compute)));
                 }
                 if cost.data > 0 {
                     parts.push(format!("\u{1F4E1} {}", format_number(cost.data)));
@@ -325,9 +325,9 @@ fn render_resource_bar(f: &mut Frame, app: &App, area: Rect) {
     if narrow {
         // Compact: use short format with K suffix
         let line = Line::from(vec![
-            Span::styled(" \u{26A1}", Style::default().fg(Color::Yellow)),
+            Span::styled(" \u{1F4B0}", Style::default().fg(Color::Yellow)),
             Span::styled(
-                format!("{}/{}", fmt_short(res.compute), fmt_short(res.max_compute)),
+                format!("${}/{}", fmt_short(res.compute), fmt_short(res.max_compute)),
                 Style::default().fg(Color::White),
             ),
             Span::raw(" "),
@@ -348,9 +348,9 @@ fn render_resource_bar(f: &mut Frame, app: &App, area: Rect) {
     } else {
         let line = Line::from(vec![
             Span::raw("  "),
-            Span::styled("\u{26A1} ", Style::default().fg(Color::Yellow)),
+            Span::styled("\u{1F4B0} ", Style::default().fg(Color::Yellow)),
             Span::styled(
-                format!("{} / {}", format_number(res.compute), format_number(res.max_compute)),
+                format!("${} / ${}", format_number(res.compute), format_number(res.max_compute)),
                 Style::default().fg(Color::White),
             ),
             Span::raw("   "),
@@ -425,7 +425,7 @@ fn describe_effect(bt: &BuildingType, def: &BuildingDef, level: u8) -> String {
     match bt {
         CpuCore | RamBank | GpuRig => {
             let resource_name = match bt {
-                CpuCore => "Compute",
+                CpuCore => "$",
                 RamBank => "Data",
                 _ => "Hype",
             };
@@ -464,7 +464,7 @@ fn describe_effect(bt: &BuildingType, def: &BuildingDef, level: u8) -> String {
 fn describe_current_bonus(bt: &BuildingType, def: &BuildingDef, level: u8) -> String {
     use BuildingType::*;
     match bt {
-        CpuCore => format!("+{} Compute storage", misanthropic::economy::storage_bonus(bt, level)),
+        CpuCore => format!("+${} storage", misanthropic::economy::storage_bonus(bt, level)),
         RamBank => format!("+{} Data storage", misanthropic::economy::storage_bonus(bt, level)),
         GpuRig => format!("+{} Hype storage", misanthropic::economy::storage_bonus(bt, level)),
         GpuCluster => {

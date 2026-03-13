@@ -175,9 +175,8 @@ fn run_loop(
 
                 if compute_gained > 0 {
                     let msg = format!(
-                        "\u{26A1} +{} COMPUTE  ({} tokens consumed)",
-                        format_number(compute_gained),
-                        format_number(update.new_tokens)
+                        "\u{1F4B0} +${} income",
+                        format_number(compute_gained)
                     );
                     app.notification = Some((msg, Instant::now()));
                 }

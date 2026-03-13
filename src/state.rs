@@ -24,7 +24,7 @@ impl Default for Resources {
             compute: 0,
             data: 0,
             hype: 0.0,
-            max_compute: 5000,  // base storage
+            max_compute: 500_000,  // base $ storage
             max_data: 1000,
             max_hype: 400.0,
         }
@@ -261,9 +261,9 @@ impl GameState {
         let ram_level = self.building_level(&BuildingType::RamBank);
         let gpu_level = self.building_level(&BuildingType::GpuRig);
 
-        self.resources.max_compute = 2500 + economy::storage_bonus(&BuildingType::CpuCore, cpu_level);
-        self.resources.max_data = 500 + economy::storage_bonus(&BuildingType::RamBank, ram_level);
-        self.resources.max_hype = 200.0 + economy::storage_bonus(&BuildingType::GpuRig, gpu_level) as f64;
+        self.resources.max_compute = 500_000 + economy::storage_bonus(&BuildingType::CpuCore, cpu_level);
+        self.resources.max_data = 1000 + economy::storage_bonus(&BuildingType::RamBank, ram_level);
+        self.resources.max_hype = 400.0 + economy::storage_bonus(&BuildingType::GpuRig, gpu_level) as f64;
     }
 
     /// Total hype per hour from all propaganda buildings, with datacenter multiplier.
@@ -439,7 +439,7 @@ impl GameState {
     /// Return the current tutorial message, or None if the tutorial is complete.
     pub fn tutorial_message(&self) -> Option<&'static str> {
         match self.tutorial_step {
-            0 => Some("\u{25BA} 25 tokens=1\u{26A1}Compute, tools=\u{1F4E1}Data. [B] Build a CPU Core!"),
+            0 => Some("\u{25BA} $1 per token, tools=\u{1F4E1}Data. [B] Build a CPU Core!"),
             1 => Some("\u{25BA} CPU online! [B] Build a Ram Bank to store \u{1F4E1}Data for research."),
             2 => Some("\u{25BA} Host is coding \u{2014} \u{26A1}and \u{1F4E1} flow in. Spread AI across the planet!"),
             3 => Some("\u{25BA} Got Data! [R] Research Social Engineering to unlock propaganda."),

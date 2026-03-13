@@ -6,6 +6,7 @@ use ratatui::{
     Frame,
 };
 
+use misanthropic::buildings::BuildingType;
 use misanthropic::sectors::SectorId;
 use super::App;
 
@@ -137,9 +138,9 @@ fn render_resources(f: &mut Frame, app: &App, area: Rect) {
     if narrow {
         // Vertical: one resource per line
         lines.push(Line::from(vec![
-            Span::styled(" \u{26A1} ", Style::default().fg(Color::Yellow)),
+            Span::styled(" \u{1F4B0} ", Style::default().fg(Color::Yellow)),
             Span::styled(
-                format!("Compute: {} / {}", fmt(res.compute), fmt(res.max_compute)),
+                format!("${} / ${}", fmt(res.compute), fmt(res.max_compute)),
                 Style::default().fg(Color::White),
             ),
             Span::styled(" (tokens)", Style::default().fg(Color::DarkGray)),
@@ -166,9 +167,9 @@ fn render_resources(f: &mut Frame, app: &App, area: Rect) {
     } else {
         // Wide: two lines + source hint
         lines.push(Line::from(vec![
-            Span::styled(" \u{26A1} Compute: ", Style::default().fg(Color::Yellow)),
+            Span::styled(" \u{1F4B0} ", Style::default().fg(Color::Yellow)),
             Span::styled(
-                format!("{} / {}", fmt(res.compute), fmt(res.max_compute)),
+                format!("${} / ${}", fmt(res.compute), fmt(res.max_compute)),
                 Style::default().fg(Color::White),
             ),
             Span::styled(" (from tokens)", Style::default().fg(Color::DarkGray)),
@@ -204,7 +205,7 @@ fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(dom_color))
-        .title(" NEURAL NETWORK ")
+        .title(" BASE ")
         .title_alignment(Alignment::Center);
 
     let inner = block.inner(area);
@@ -256,7 +257,7 @@ fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
     // --- Entity visualization ---
     if entity_height >= 1 {
         let entity_area = Rect::new(inner.x, inner.y, inner.width, entity_height);
-        let entity_lines = render_entity(dominance, entity_area.width, entity_area.height, app);
+        let entity_lines = render_base(app, entity_area.width, entity_area.height);
         let entity_paragraph = Paragraph::new(entity_lines).alignment(Alignment::Center);
         f.render_widget(entity_paragraph, entity_area);
     }
@@ -328,10 +329,31 @@ fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(paragraph, sector_area);
 }
 
-/// Render a growing entity visualization that expands as dominance increases.
-/// Uses block characters with density: dense at center, sparse at edges.
-/// Returns a Vec<Line> to be rendered in the given area.
-fn render_entity(dominance: f64, width: u16, height: u16, app: &App) -> Vec<Line<'static>> {
+/// A building to render in the base skyline.
+struct SkylineBuilding {
+    label: &'static str,
+    level: u8,
+    color: Color,
+}
+
+/// Calculate the height (number of blocks) for a building based on its level.
+fn building_height(level: u8) -> usize {
+    if level == 0 {
+        0
+    } else if level <= 3 {
+        1
+    } else if level <= 7 {
+        2
+    } else if level <= 12 {
+        3
+    } else {
+        4
+    }
+}
+
+/// Render the base/city skyline visualization.
+/// Buildings appear as small ASCII art icons that grow taller with level.
+fn render_base(app: &App, width: u16, height: u16) -> Vec<Line<'static>> {
     let w = width as usize;
     let h = height as usize;
 
@@ -339,103 +361,229 @@ fn render_entity(dominance: f64, width: u16, height: u16, app: &App) -> Vec<Line
         return vec![];
     }
 
-    // At 0%, show just a single marker
-    if dominance < 0.1 {
-        let mut lines = Vec::new();
-        for _ in 0..h.saturating_sub(1) {
-            lines.push(Line::from(""));
+    // Collect all buildings with level > 0, grouped by category
+    let infrastructure: Vec<(&str, BuildingType)> = vec![
+        ("C ", BuildingType::CpuCore),
+        ("R ", BuildingType::RamBank),
+        ("G ", BuildingType::GpuRig),
+        ("gc", BuildingType::GpuCluster),
+        ("DC", BuildingType::Datacenter),
+        ("QC", BuildingType::QuantumCore),
+    ];
+    let propaganda: Vec<(&str, BuildingType)> = vec![
+        ("bf", BuildingType::BotFarm),
+        ("cm", BuildingType::ContentMill),
+        ("ml", BuildingType::MemeLab),
+        ("df", BuildingType::DeepfakeStudio),
+        ("va", BuildingType::VibeAcademy),
+        ("nw", BuildingType::NsfwGenerator),
+        ("lo", BuildingType::LobbyOffice),
+    ];
+    let defenses: Vec<(&str, BuildingType)> = vec![
+        ("cw", BuildingType::CaptchaWall),
+        ("sf", BuildingType::AiSlopFilter),
+        ("ub", BuildingType::UblockShield),
+        ("hs", BuildingType::HarvardStudy),
+        ("eu", BuildingType::EuAiAct),
+    ];
+
+    let mut buildings: Vec<SkylineBuilding> = Vec::new();
+
+    for (label, bt) in &infrastructure {
+        let level = app.state.building_level(bt);
+        if level > 0 {
+            buildings.push(SkylineBuilding {
+                label,
+                level,
+                color: Color::Green,
+            });
         }
-        lines.push(Line::from(Span::styled(
-            "\u{25C9}",
-            Style::default().fg(Color::DarkGray),
-        )));
+    }
+    for (label, bt) in &propaganda {
+        let level = app.state.building_level(bt);
+        if level > 0 {
+            buildings.push(SkylineBuilding {
+                label,
+                level,
+                color: Color::Magenta,
+            });
+        }
+    }
+    for (label, bt) in &defenses {
+        let level = app.state.building_level(bt);
+        if level > 0 {
+            buildings.push(SkylineBuilding {
+                label,
+                level,
+                color: Color::Cyan,
+            });
+        }
+    }
+
+    // Ground line takes 1 row; each building is 4 chars wide (including gap)
+    // Reserve 1 line for ground, the rest for building blocks + top/bottom borders
+    let ground_row = h.saturating_sub(1);
+
+    // If no buildings, show empty base
+    if buildings.is_empty() {
+        let mut lines: Vec<Line> = Vec::new();
+        for r in 0..h {
+            if r == ground_row {
+                let ground = "\u{2500}".repeat(w);
+                let label = "[ empty base ]";
+                if w >= label.len() + 2 {
+                    let pad_left = (w - label.len()) / 2;
+                    let pad_right = w - label.len() - pad_left;
+                    let ground_line = format!(
+                        "{}{}{}",
+                        "\u{2500}".repeat(pad_left),
+                        label,
+                        "\u{2500}".repeat(pad_right),
+                    );
+                    lines.push(Line::from(Span::styled(
+                        ground_line,
+                        Style::default().fg(Color::DarkGray),
+                    )));
+                } else {
+                    lines.push(Line::from(Span::styled(
+                        ground,
+                        Style::default().fg(Color::DarkGray),
+                    )));
+                }
+            } else {
+                lines.push(Line::from(""));
+            }
+        }
         return lines;
     }
 
-    let dom_color = dominance_color(dominance);
+    // Each building occupies 4 columns: [xx] with one space gap
+    // Total width per building = 4 (the box) + 1 (gap) = 5, except the last (4)
+    let building_width = 4usize; // [xx]
+    let gap = 1usize;
 
-    // Entity radius scales with dominance. At 100% it fills the available area.
-    let max_radius_x = (w as f64) / 2.0;
-    let max_radius_y = (h as f64) / 2.0;
-    let scale = (dominance / 100.0).sqrt(); // sqrt so early growth is visible
+    // If too many to fit, truncate to what fits
+    let max_buildings = if w >= building_width {
+        (w + gap) / (building_width + gap)
+    } else {
+        0
+    };
 
-    let rx = (max_radius_x * scale).max(1.0);
-    let ry = (max_radius_y * scale).max(1.0);
+    let visible_count = buildings.len().min(max_buildings);
+    let visible = &buildings[..visible_count];
 
-    let cx = w as f64 / 2.0;
-    let cy = h as f64 / 2.0;
+    // The maximum building height we can render (excluding ground line)
+    // Each building block = 1 row, top border = 1 row, bottom border = 1 row
+    // So total rendered height for a building of block-height H = H + 2 (top + bottom border)
+    let max_block_height = if ground_row >= 2 { ground_row - 2 } else { 0 };
 
-    // Time-based animation seed for subtle movement
-    let time_ms = app.boot_timer.elapsed().as_millis() as f64;
-    let time_phase = time_ms / 1500.0; // slow cycle
+    // Clamp all building heights
+    let bld_heights: Vec<usize> = visible
+        .iter()
+        .map(|b| building_height(b.level).min(if max_block_height > 0 { max_block_height } else { 1 }))
+        .collect();
+    let _tallest = bld_heights.iter().copied().max().unwrap_or(0);
+
+    // The buildings sit on the ground. The bottom border row is at ground_row - 1,
+    // the label row is at ground_row - 2, etc.
+    // Actually, let's place the bottom of the building (└──┘) right above the ground line.
+    // So: ground_row is the ground line. Building rows go from ground_row-1 upward.
+    // Bottom border at row: ground_row - 1
+    // Label at row: ground_row - 2
+    // Block rows above label: ground_row - 3, etc.
+    // Top border at row: ground_row - 1 - (block_height + 1)
+
+    // Build a 2D grid of spans. We'll render row by row.
+    // Compute starting x offset to center the skyline
+    let skyline_width = if visible_count > 0 {
+        visible_count * building_width + (visible_count - 1) * gap
+    } else {
+        0
+    };
+    let x_offset = if w > skyline_width {
+        (w - skyline_width) / 2
+    } else {
+        0
+    };
 
     let mut lines: Vec<Line> = Vec::new();
 
     for row in 0..h {
-        let mut spans: Vec<Span> = Vec::new();
-        let mut current_text = String::new();
-        let mut current_style: Option<Style> = None;
-
-        for col in 0..w {
-            let dx = (col as f64 - cx) / rx;
-            let dy = (row as f64 - cy) / ry;
-            let dist = (dx * dx + dy * dy).sqrt();
-
-            // Deterministic noise for organic look
-            let noise = deterministic_noise(col as u32, row as u32, (time_phase * 3.0) as u32);
-
-            // Distance threshold with noise for organic boundary
-            let threshold = 1.0 + noise * 0.35;
-
-            let (ch, style) = if dist < threshold {
-                let density = 1.0 - (dist / threshold);
-
-                // Inner pulsing core
-                let core_pulse = ((time_phase * 2.0).sin() * 0.15 + 0.85) as f64;
-                let adjusted_density = density * core_pulse;
-
-                let (block_char, color) = if adjusted_density > 0.8 {
-                    // Dense core
-                    ('\u{2588}', brighten(dom_color, 40))
-                } else if adjusted_density > 0.55 {
-                    ('\u{2593}', dom_color)
-                } else if adjusted_density > 0.3 {
-                    ('\u{2592}', dim_color(dom_color, 40))
-                } else if adjusted_density > 0.1 {
-                    ('\u{2591}', dim_color(dom_color, 80))
-                } else {
-                    (' ', Color::Reset)
-                };
-
-                (block_char, Style::default().fg(color))
-            } else {
-                (' ', Style::default())
-            };
-
-            // Batch same-style characters into one Span for efficiency
-            let new_style = style;
-            if let Some(prev) = current_style {
-                if prev == new_style {
-                    current_text.push(ch);
-                } else {
-                    if !current_text.is_empty() {
-                        spans.push(Span::styled(current_text.clone(), prev));
-                        current_text.clear();
-                    }
-                    current_text.push(ch);
-                    current_style = Some(new_style);
-                }
-            } else {
-                current_text.push(ch);
-                current_style = Some(new_style);
-            }
+        if row == ground_row {
+            // Ground line
+            let ground = "\u{2500}".repeat(w);
+            lines.push(Line::from(Span::styled(
+                ground,
+                Style::default().fg(Color::DarkGray),
+            )));
+            continue;
         }
 
-        // Flush remaining
-        if !current_text.is_empty() {
-            if let Some(s) = current_style {
-                spans.push(Span::styled(current_text, s));
+        let mut spans: Vec<Span> = Vec::new();
+        let mut col = 0usize;
+
+        for (i, bld) in visible.iter().enumerate() {
+            let bh = bld_heights[i];
+            let rendered_h = bh + 2; // top border + blocks + bottom border
+
+            // This building's x position
+            let bx = x_offset + i * (building_width + gap);
+
+            // This building occupies rows:
+            // bottom border: ground_row - 1
+            // label row: ground_row - 2
+            // block rows: ground_row - 3 .. ground_row - 2 - (bh - 1)  (if bh > 1)
+            // top border: ground_row - 1 - (bh + 1) = ground_row - bh - 2
+            let bottom_border_row = ground_row.saturating_sub(1);
+            let top_border_row = ground_row.saturating_sub(rendered_h);
+            let label_row = bottom_border_row.saturating_sub(1);
+
+            // Pad to this building's x position
+            if col < bx {
+                spans.push(Span::raw(" ".repeat(bx - col)));
+                col = bx;
             }
+
+            let style = Style::default().fg(bld.color);
+
+            if row == top_border_row && row < ground_row {
+                spans.push(Span::styled("\u{250C}\u{2500}\u{2500}\u{2510}", style));
+                col += building_width;
+            } else if row == bottom_border_row {
+                spans.push(Span::styled("\u{2514}\u{2500}\u{2500}\u{2518}", style));
+                col += building_width;
+            } else if row == label_row && row > top_border_row {
+                spans.push(Span::styled(
+                    format!("\u{2502}{}\u{2502}", bld.label),
+                    style,
+                ));
+                col += building_width;
+            } else if row > top_border_row && row < label_row {
+                // Block fill rows - higher rows get denser fill
+                let rows_above_label = label_row.saturating_sub(row);
+                let total_block_rows = bh.saturating_sub(1);
+                let fill_char = if total_block_rows > 0 {
+                    let ratio = rows_above_label as f64 / total_block_rows as f64;
+                    if ratio > 0.66 {
+                        "\u{2588}\u{2588}" // top blocks: full
+                    } else {
+                        "\u{2593}\u{2593}" // middle blocks: medium
+                    }
+                } else {
+                    "\u{2593}\u{2593}"
+                };
+                spans.push(Span::styled(
+                    format!("\u{2502}{}\u{2502}", fill_char),
+                    style,
+                ));
+                col += building_width;
+            }
+            // else: this row is outside this building's vertical range, leave blank
+        }
+
+        // Pad remaining
+        if col < w {
+            spans.push(Span::raw(" ".repeat(w - col)));
         }
 
         lines.push(Line::from(spans));
@@ -446,6 +594,7 @@ fn render_entity(dominance: f64, width: u16, height: u16, app: &App) -> Vec<Line
 
 /// Simple deterministic noise based on coordinates and a seed.
 /// Returns a value in [-1.0, 1.0].
+#[allow(dead_code)]
 fn deterministic_noise(x: u32, y: u32, seed: u32) -> f64 {
     // Simple hash-based noise
     let mut h = x.wrapping_mul(374761393)
@@ -458,6 +607,7 @@ fn deterministic_noise(x: u32, y: u32, seed: u32) -> f64 {
 }
 
 /// Make a color brighter by the given amount.
+#[allow(dead_code)]
 fn brighten(color: Color, amount: u8) -> Color {
     match color {
         Color::Green => Color::Rgb(0, (255u16).min(255) as u8, 0),
@@ -474,6 +624,7 @@ fn brighten(color: Color, amount: u8) -> Color {
 }
 
 /// Dim a color by reducing its intensity.
+#[allow(dead_code)]
 fn dim_color(color: Color, amount: u8) -> Color {
     match color {
         Color::Green => Color::Rgb(0, 255u8.saturating_sub(amount), 0),
@@ -601,7 +752,7 @@ pub fn render_notification(f: &mut Frame, msg: &str, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Green))
-        .title(" \u{26A1} COMPUTE ")
+        .title(" \u{1F4B0} INCOME ")
         .title_alignment(Alignment::Center);
 
     let paragraph = Paragraph::new(vec![

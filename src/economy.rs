@@ -1,6 +1,6 @@
-/// 25 Claude tokens = 1 Compute. Fixed ratio.
+/// 1 Claude token = $1. Direct mapping.
 pub fn tokens_to_compute(tokens: u64) -> u64 {
-    tokens / 25
+    tokens
 }
 
 /// 1 tool call = 1 Data. Direct mapping.
@@ -39,9 +39,9 @@ pub fn storage_bonus(building_type: &crate::buildings::BuildingType, level: u8) 
         return 0;
     }
     let base = match building_type {
-        BuildingType::CpuCore => 1200,
-        BuildingType::RamBank => 500,
-        BuildingType::GpuRig => 600,
+        BuildingType::CpuCore => 100_000,  // $ storage
+        BuildingType::RamBank => 400,       // data storage
+        BuildingType::GpuRig => 150,        // hype storage
         _ => return 0,
     };
     // Cumulative: sum of base * 1.5^(i-1) for i=1..=level
