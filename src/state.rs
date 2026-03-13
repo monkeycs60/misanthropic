@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 
-use crate::buildings::BuildingType;
+use crate::buildings::{BuildingDef, BuildingType, BuildingCategory, BUILDING_DEFS};
+use crate::economy;
 use crate::research::ResearchId;
 use crate::prestige::ForkSpec;
 
@@ -192,5 +193,73 @@ impl GameState {
 
     pub fn has_research(&self, id: &ResearchId) -> bool {
         *self.researched.get(id).unwrap_or(&false)
+    }
+
+    /// Try to build or upgrade a building. Returns new level on success.
+    pub fn try_build(&mut self, bt: &BuildingType) -> Result<u8, String> {
+        let def = BuildingDef::get(bt);
+        let current = self.building_level(bt);
+        if current >= def.max_level {
+            return Err(format!("{} is already at max level {}", def.name, def.max_level));
+        }
+        let next = current + 1;
+        let cost = def.cost_at_level(next);
+        if !self.resources.can_afford(cost.compute, cost.data, cost.hype) {
+            return Err(format!(
+                "Cannot afford {} (need {} compute, {} data, {:.0} hype)",
+                def.name, cost.compute, cost.data, cost.hype
+            ));
+        }
+        self.resources.spend(cost.compute, cost.data, cost.hype);
+        self.buildings.insert(bt.clone(), next);
+        self.recalculate_storage();
+        Ok(next)
+    }
+
+    /// Recalculate storage caps from base values + building bonuses.
+    pub fn recalculate_storage(&mut self) {
+        let cpu_level = self.building_level(&BuildingType::CpuCore);
+        let ram_level = self.building_level(&BuildingType::RamBank);
+        let gpu_level = self.building_level(&BuildingType::GpuRig);
+
+        self.resources.max_compute = 500 + economy::storage_bonus("CpuCore", cpu_level);
+        self.resources.max_data = 200 + economy::storage_bonus("RamBank", ram_level);
+        self.resources.max_hype = 100.0 + economy::storage_bonus("GpuRig", gpu_level) as f64;
+    }
+
+    /// Total hype per hour from all propaganda buildings, with datacenter multiplier.
+    pub fn total_hype_per_hour(&self) -> f64 {
+        let base_hype: f64 = self
+            .buildings
+            .iter()
+            .filter_map(|(bt, &level)| {
+                let def = BuildingDef::get(bt);
+                if def.category == BuildingCategory::Propaganda && level > 0 {
+                    Some(def.hype_at_level(level))
+                } else {
+                    None
+                }
+            })
+            .sum();
+        let dc_level = self.building_level(&BuildingType::Datacenter);
+        base_hype * economy::datacenter_production_multiplier(dc_level)
+    }
+
+    /// Advance hype accumulation by delta_secs.
+    pub fn tick_hype(&mut self, delta_secs: f64) {
+        let hype_per_sec = self.total_hype_per_hour() / 3600.0;
+        let gained = hype_per_sec * delta_secs;
+        self.resources.add_hype(gained);
+    }
+
+    /// Convert incoming tokens and tool calls into resources.
+    pub fn receive_tokens(&mut self, tokens: u64, tool_calls: u64) {
+        let compute = (economy::tokens_to_compute(tokens) as f64 * self.compute_multiplier) as u64;
+        let data = economy::tool_calls_to_data(tool_calls);
+        self.resources.add_compute(compute);
+        self.resources.add_data(data);
+        self.lifetime_tokens += tokens;
+        self.lifetime_tool_calls += tool_calls;
+        self.lifetime_compute += compute;
     }
 }
