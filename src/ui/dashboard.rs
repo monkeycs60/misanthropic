@@ -339,12 +339,15 @@ fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
 
 /// A building to render in the base skyline.
 struct SkylineBuilding {
-    /// 3 lines of art, each exactly `art_width` chars wide
+    /// 3 lines of base art, each exactly `col_width` chars wide
     art: [&'static str; 3],
-    art_width: usize,
+    /// Width of each column in chars
+    col_width: usize,
     name: &'static str,
     level: u8,
     color: Color,
+    /// Extra floors above the 3-line base art (grows with level)
+    extra_floors: usize,
 }
 
 /// Get the ASCII art icon for a building type. Each icon is 3 lines tall.
@@ -352,30 +355,56 @@ struct SkylineBuilding {
 fn building_art(bt: &BuildingType) -> ([&'static str; 3], usize) {
     use BuildingType::*;
     match bt {
-        //                     top / mid / bot
-        CpuCore =>       (["  \u{2502}\u{2502}  ", " \u{250C}\u{2550}\u{2550}\u{2510} ", " \u{2514}\u{2550}\u{2550}\u{2518} "], 6),  //   ||   ╔══╗  ╚══╝
-        RamBank =>       ([" \u{2584}\u{2584}\u{2584}\u{2584} ", " \u{2588}\u{2591}\u{2591}\u{2588} ", " \u{2580}\u{2580}\u{2580}\u{2580} "], 6),  //  ▄▄▄▄  █░░█  ▀▀▀▀
-        GpuRig =>        ([" /\u{2588}\u{2588}\\ ", " \u{2588}\u{2593}\u{2593}\u{2588} ", " \u{2580}\u{2580}\u{2580}\u{2580} "], 6),  //  /██\  █▓▓█  ▀▀▀▀
-        GpuCluster =>    (["\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}", "\u{2588}\u{2593}\u{2593}\u{2593}\u{2593}\u{2588}", "\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}"], 6),  //  ██████ █▓▓▓▓█ ██████
-        Datacenter =>    (["\u{250C}\u{2500}\u{2500}\u{2500}\u{2500}\u{2510}", "\u{2502}\u{2593}\u{2593}\u{2593}\u{2593}\u{2502}", "\u{2514}\u{2550}\u{2550}\u{2550}\u{2550}\u{2518}"], 6),
-        QuantumCore =>   ([" \u{25C6}\u{2237}\u{25C6} ", " \u{2237}\u{2588}\u{2588}\u{2237} ", " \u{25C6}\u{2237}\u{25C6} "], 6),
-        BotFarm =>       ([" \u{250C}\u{2510}\u{250C}\u{2510} ", " \u{00B0}\u{2514}\u{2518}\u{00B0} ", "  \u{2534}\u{2534}  "], 6),  // robots
-        ContentMill =>   ([" \u{2261}\u{2261}\u{2261}\u{2261} ", " \u{2261}\u{2261}\u{2261}\u{2261} ", " \u{2500}\u{2500}\u{2500}\u{2500} "], 6),  // text lines
-        MemeLab =>       (["  :)  ", " \u{250C}\u{2500}\u{2500}\u{2510} ", " \u{2514}\u{2500}\u{2500}\u{2518} "], 6),
-        DeepfakeStudio =>([" \u{25D0}\u{2500}\u{2500}\u{25D1} ", " \u{2502}\u{2588}\u{2588}\u{2502} ", " \u{25D0}\u{2500}\u{2500}\u{25D1} "], 6),  // camera
-        VibeAcademy =>   ([" \u{2229}\u{2229}\u{2229} ", " \u{2502}\u{2588}\u{2502} ", " \u{2514}\u{2500}\u{2518} "], 5),
-        NsfwGenerator => ([" \u{2588}\u{2591}\u{2588}\u{2591} ", " \u{2591}\u{2588}\u{2591}\u{2588} ", " \u{2580}\u{2584}\u{2580}\u{2584} "], 6),
-        LobbyOffice =>   ([" \u{25B2}  ", " /\\ ", "/\u{2550}\u{2550}\\"], 4),
-        CaptchaWall =>   (["\u{2591}\u{2592}\u{2593}\u{2591}\u{2592}\u{2593}", "\u{2593}\u{2591}\u{2592}\u{2593}\u{2591}\u{2592}", "\u{2592}\u{2593}\u{2591}\u{2592}\u{2593}\u{2591}"], 6),  // noisy wall
-        AiSlopFilter =>  ([" \u{2207}\u{2207}\u{2207} ", " \u{2502}\u{2502}\u{2502} ", " \u{2228}\u{2228}\u{2228} "], 5),  // funnels
-        UblockShield =>  ([" \u{250C}\u{2500}\u{2510} ", " \u{2502}\u{2716}\u{2502} ", " \u{2514}\u{2500}\u{2518} "], 5),  // shield with X
-        HarvardStudy =>  ([" \u{250C}\u{2500}\u{2510} ", " \u{2502}H\u{2502} ", " \u{2514}\u{2500}\u{2518} "], 5),
-        EuAiAct =>       (["\u{2592}\u{2592}\u{2592}\u{2592}\u{2592}", "\u{2592}EU \u{2592}", "\u{2592}\u{2592}\u{2592}\u{2592}\u{2592}"], 5),
+        CpuCore =>       (["  ||  ", " +==+ ", " +==+ "], 6),
+        RamBank =>       ([" .__. ", " |..|", " '--' "], 6),
+        GpuRig =>        ([" /==\\ ", " |##| ", " \\==/ "], 6),
+        GpuCluster =>    (["[####]", "[#{}#]", "[####]"], 6),
+        Datacenter =>    (["+----+", "|::::|", "+====+"], 6),
+        QuantumCore =>   ([" <**> ", " *{}* ", " <**> "], 6),
+        BotFarm =>       ([" d  b ", " |''| ", "  /\\  "], 6),
+        ContentMill =>   ([" ==== ", " ==== ", " ---- "], 6),
+        MemeLab =>       (["  :)  ", " +--+ ", " +--+ "], 6),
+        DeepfakeStudio =>([" (--) ", " |##| ", " (--) "], 6),
+        VibeAcademy =>   ([" /\"\"\\ ", " |##| ", " +--+ "], 6),
+        NsfwGenerator => ([" #--# ", " |##| ", " #--# "], 6),
+        LobbyOffice =>   ([" /^^\\  ", " |$$| ", " +--+ "], 6),
+        CaptchaWall =>   (["[????]", "[?!!?]", "[????]"], 6),
+        AiSlopFilter =>  ([" \\\\// ", "  ||  ", " //\\\\ "], 6),
+        UblockShield =>  ([" .--. ", " |><| ", " '--' "], 6),
+        HarvardStudy =>  ([" .--. ", " |Hv| ", " '--' "], 6),
+        EuAiAct =>       (["[%EU%]", "[%%%%]", "[%%%%]"], 6),
+    }
+}
+
+/// How many extra floor rows above the 3-line base art, based on level.
+/// Level 1-2: 0 extra, 3-5: 1, 6-9: 2, 10-14: 3, 15-20: 4
+fn extra_floors(level: u8) -> usize {
+    match level {
+        0..=2 => 0,
+        3..=5 => 1,
+        6..=9 => 2,
+        10..=14 => 3,
+        _ => 4,
+    }
+}
+
+/// Generate a floor row for stacking above the base art.
+/// Alternates between two patterns for visual variety.
+fn floor_row(col_width: usize, floor_idx: usize, color: Color) -> (String, Color) {
+    let inner = col_width.saturating_sub(2);
+    if floor_idx % 2 == 0 {
+        // Window floor: |..|
+        let fill: String = (0..inner).map(|i| if i % 2 == 0 { '.' } else { ':' }).collect();
+        (format!("|{}|", fill), color)
+    } else {
+        // Solid floor: |##|
+        let fill = "#".repeat(inner);
+        (format!("|{}|", fill), color)
     }
 }
 
 /// Render the base/city skyline visualization.
-/// Buildings appear as distinct ASCII art icons with their name below.
+/// Buildings grow taller with level: 3-line base art + extra floor rows stacked above.
 fn render_base(app: &App, width: u16, height: u16) -> Vec<Line<'static>> {
     let w = width as usize;
     let h = height as usize;
@@ -411,19 +440,18 @@ fn render_base(app: &App, width: u16, height: u16) -> Vec<Line<'static>> {
         let level = app.state.building_level(bt);
         if level > 0 {
             let def = misanthropic::buildings::BuildingDef::get(bt);
-            let (art, art_width) = building_art(bt);
+            let (art, col_width) = building_art(bt);
             buildings.push(SkylineBuilding {
                 art,
-                art_width,
+                col_width,
                 name: def.name,
                 level,
                 color: *color,
+                extra_floors: extra_floors(level),
             });
         }
     }
 
-    // Layout: ground line at bottom, name row above ground, art 3 lines above name
-    // Total per building: 3 (art) + 1 (name+level) + 1 (ground) = 5 rows minimum
     let ground_row = h.saturating_sub(1);
 
     // Empty base
@@ -452,40 +480,33 @@ fn render_base(app: &App, width: u16, height: u16) -> Vec<Line<'static>> {
         return lines;
     }
 
-    // Each building needs art_width + 2 gap. Compute layout.
-    let gap = 2usize;
-    let max_buildings = {
-        let mut count = 0;
-        let mut used = 0;
-        for b in &buildings {
-            let needed = if count == 0 { b.art_width } else { gap + b.art_width };
-            if used + needed <= w {
-                used += needed;
-                count += 1;
-            } else {
-                break;
-            }
-        }
-        count
-    };
+    // Layout: all buildings use col_width=6, gap=1
+    let col_w = 6usize;
+    let gap = 1usize;
+    let max_count = if w >= col_w { (w + gap) / (col_w + gap) } else { 0 };
+    let visible_count = buildings.len().min(max_count);
+    let visible = &buildings[..visible_count];
 
-    let visible = &buildings[..max_buildings.min(buildings.len())];
-    let skyline_width: usize = visible.iter().map(|b| b.art_width).sum::<usize>()
-        + if visible.len() > 1 { (visible.len() - 1) * gap } else { 0 };
-    let x_offset = if w > skyline_width { (w - skyline_width) / 2 } else { 0 };
+    let skyline_w = visible_count * col_w + visible_count.saturating_sub(1) * gap;
+    let x_off = if w > skyline_w { (w - skyline_w) / 2 } else { 0 };
 
-    // Row assignments (from bottom):
-    // ground_row: ─── ground line
-    // ground_row - 1: name + level labels
-    // ground_row - 2: art line 2 (bottom)
-    // ground_row - 3: art line 1 (middle)
-    // ground_row - 4: art line 0 (top)
+    // Row layout from bottom:
+    //   ground_row:     ─── ground line
+    //   ground_row - 1: name labels (e.g. "CPU 15")
+    //   ground_row - 2: art[2] (base bottom)
+    //   ground_row - 3: art[1] (base middle)
+    //   ground_row - 4: art[0] (base top)
+    //   ground_row - 5: extra floor 0 (if any)
+    //   ground_row - 6: extra floor 1 (if any)
+    //   ... etc
+    //   ground_row - 4 - extra_floors: roof (top cap)
     let name_row = ground_row.saturating_sub(1);
-    let art_rows = [
-        ground_row.saturating_sub(4), // art[0] top
-        ground_row.saturating_sub(3), // art[1] mid
-        ground_row.saturating_sub(2), // art[2] bot
-    ];
+    let art_base = ground_row.saturating_sub(2); // art[2]
+
+    // Max total height for tallest building
+    let tallest = visible.iter().map(|b| 3 + b.extra_floors + 1).max().unwrap_or(4); // +1 for roof
+    // Clamp to available space (above name row)
+    let available = name_row; // rows 0..name_row-1
 
     let mut lines: Vec<Line> = Vec::new();
 
@@ -498,54 +519,85 @@ fn render_base(app: &App, width: u16, height: u16) -> Vec<Line<'static>> {
             continue;
         }
 
-        // Check if this row is an art row or name row
-        let art_idx = art_rows.iter().position(|&r| r == row);
-        let is_name = row == name_row;
-
-        if art_idx.is_none() && !is_name {
-            lines.push(Line::from(""));
-            continue;
-        }
-
         let mut spans: Vec<Span> = Vec::new();
         let mut col = 0usize;
+        let mut any_content = false;
 
         for (i, bld) in visible.iter().enumerate() {
-            let bx = x_offset + visible[..i].iter().map(|b| b.art_width).sum::<usize>() + i * gap;
+            let bx = x_off + i * (col_w + gap);
 
-            if col < bx {
-                spans.push(Span::raw(" ".repeat(bx - col)));
-                col = bx;
-            }
+            // This building's row layout:
+            //   name_row: name
+            //   art_base: art[2]
+            //   art_base - 1: art[1]
+            //   art_base - 2: art[0]
+            //   art_base - 3: floor 0
+            //   art_base - 4: floor 1
+            //   ...
+            //   art_base - 2 - extra_floors: roof cap
+            let floors = bld.extra_floors.min(available.saturating_sub(4)); // clamp to fit
+            let roof_row = art_base.saturating_sub(2 + floors);
 
-            let style = Style::default().fg(bld.color);
+            let content: Option<(String, Style)> = if row == name_row {
+                // Name + level label
+                let short: String = bld.name.chars().take(3).collect();
+                let label = format!("{}{:>2}", short, bld.level);
+                let padded = format!("{:^w$}", label, w = col_w);
+                Some((padded, Style::default().fg(Color::DarkGray)))
+            } else if row == art_base {
+                Some((pad_to(bld.art[2], col_w), Style::default().fg(bld.color)))
+            } else if row == art_base.saturating_sub(1) && row < art_base {
+                Some((pad_to(bld.art[1], col_w), Style::default().fg(bld.color)))
+            } else if row == art_base.saturating_sub(2) && row < art_base.saturating_sub(1) {
+                Some((pad_to(bld.art[0], col_w), Style::default().fg(bld.color)))
+            } else if floors > 0 && row < art_base.saturating_sub(2) && row > roof_row {
+                // Extra floor row
+                let floor_idx = art_base.saturating_sub(3).saturating_sub(row);
+                let (floor_str, _) = floor_row(col_w, floor_idx, bld.color);
+                Some((pad_to(&floor_str, col_w), Style::default().fg(bld.color)))
+            } else if floors > 0 && row == roof_row {
+                // Roof cap
+                let inner = col_w.saturating_sub(2);
+                let roof = format!("+{}+", "-".repeat(inner));
+                Some((pad_to(&roof, col_w), Style::default().fg(bld.color)))
+            } else {
+                None
+            };
 
-            if let Some(ai) = art_idx {
-                spans.push(Span::styled(bld.art[ai], style));
-                col += bld.art_width;
-            } else if is_name {
-                // Center the name under the art, show level
-                let label = if bld.art_width >= 6 {
-                    let truncated: String = bld.name.chars().take(bld.art_width.saturating_sub(1)).collect();
-                    format!("{:^w$}", format!("{}{}", truncated, bld.level), w = bld.art_width)
-                } else {
-                    format!("{:^w$}", format!("L{}", bld.level), w = bld.art_width)
-                };
-                spans.push(Span::styled(
-                    label,
-                    Style::default().fg(Color::DarkGray),
-                ));
-                col += bld.art_width;
+            if let Some((text, style)) = content {
+                if col < bx {
+                    spans.push(Span::raw(" ".repeat(bx - col)));
+                    col = bx;
+                }
+                spans.push(Span::styled(text, style));
+                col += col_w;
+                any_content = true;
             }
         }
 
-        if col < w {
-            spans.push(Span::raw(" ".repeat(w - col)));
+        if any_content {
+            if col < w {
+                spans.push(Span::raw(" ".repeat(w - col)));
+            }
+            lines.push(Line::from(spans));
+        } else {
+            lines.push(Line::from(""));
         }
-        lines.push(Line::from(spans));
     }
 
     lines
+}
+
+/// Pad or truncate a string to exactly `width` chars, centered.
+fn pad_to(s: &str, width: usize) -> String {
+    let len = s.chars().count();
+    if len >= width {
+        s.chars().take(width).collect()
+    } else {
+        let pad_l = (width - len) / 2;
+        let pad_r = width - len - pad_l;
+        format!("{}{}{}", " ".repeat(pad_l), s, " ".repeat(pad_r))
+    }
 }
 
 /// Simple deterministic noise based on coordinates and a seed.
