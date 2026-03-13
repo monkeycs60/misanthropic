@@ -1,4 +1,5 @@
 pub mod boot;
+pub mod buildings;
 pub mod dashboard;
 
 use misanthropic::state::GameState;
@@ -24,6 +25,8 @@ pub struct App {
     pub boot_timer: Instant,
     pub selected_index: usize,
     pub notification: Option<(String, Instant)>,
+    pub building_tab: u8,
+    pub building_selected: usize,
 }
 
 impl App {
@@ -43,6 +46,8 @@ impl App {
             boot_timer: Instant::now(),
             selected_index: 0,
             notification: None,
+            building_tab: 0,
+            building_selected: 0,
         }
     }
 

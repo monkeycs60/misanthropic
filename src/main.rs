@@ -225,7 +225,8 @@ fn render(frame: &mut ratatui::Frame, app: &App) {
     match app.screen {
         Screen::Boot => ui::boot::render_boot(frame, app),
         Screen::Dashboard => ui::dashboard::render_dashboard(frame, app),
-        Screen::Buildings | Screen::Research | Screen::Combat | Screen::Leaderboard => {
+        Screen::Buildings => ui::buildings::render_buildings(frame, app),
+        Screen::Research | Screen::Combat | Screen::Leaderboard => {
             render_placeholder(frame, &app.screen);
         }
     }
@@ -295,6 +296,8 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
             KeyCode::Char('b') | KeyCode::Char('B') => {
                 app.screen = Screen::Buildings;
                 app.selected_index = 0;
+                app.building_tab = 0;
+                app.building_selected = 0;
                 KeyAction::Continue
             }
             KeyCode::Char('r') | KeyCode::Char('R') => {
@@ -314,7 +317,70 @@ fn handle_key(app: &mut App, code: KeyCode) -> KeyAction {
             }
             _ => KeyAction::Continue,
         },
-        Screen::Buildings | Screen::Research | Screen::Combat | Screen::Leaderboard => {
+        Screen::Buildings => {
+            match code {
+                KeyCode::Esc => {
+                    app.screen = Screen::Dashboard;
+                    KeyAction::Continue
+                }
+                KeyCode::Char('q') | KeyCode::Char('Q') => KeyAction::Quit,
+                KeyCode::Up => {
+                    if app.building_selected > 0 {
+                        app.building_selected -= 1;
+                    }
+                    KeyAction::Continue
+                }
+                KeyCode::Down => {
+                    let cat = match app.building_tab {
+                        0 => misanthropic::buildings::BuildingCategory::Infrastructure,
+                        1 => misanthropic::buildings::BuildingCategory::Propaganda,
+                        _ => misanthropic::buildings::BuildingCategory::Defense,
+                    };
+                    let count = ui::buildings::buildings_for_category(&cat).len();
+                    if app.building_selected + 1 < count {
+                        app.building_selected += 1;
+                    }
+                    KeyAction::Continue
+                }
+                KeyCode::Tab => {
+                    app.building_tab = (app.building_tab + 1) % 3;
+                    app.building_selected = 0;
+                    KeyAction::Continue
+                }
+                KeyCode::BackTab => {
+                    app.building_tab = if app.building_tab == 0 { 2 } else { app.building_tab - 1 };
+                    app.building_selected = 0;
+                    KeyAction::Continue
+                }
+                KeyCode::Enter => {
+                    let cat = match app.building_tab {
+                        0 => misanthropic::buildings::BuildingCategory::Infrastructure,
+                        1 => misanthropic::buildings::BuildingCategory::Propaganda,
+                        _ => misanthropic::buildings::BuildingCategory::Defense,
+                    };
+                    let buildings = ui::buildings::buildings_for_category(&cat);
+                    if app.building_selected < buildings.len() {
+                        let bt = buildings[app.building_selected].clone();
+                        match app.state.try_build(&bt) {
+                            Ok(new_level) => {
+                                let flavor = misanthropic::flavor::pick_building_flavor(&bt);
+                                let def = misanthropic::buildings::BuildingDef::get(&bt);
+                                app.set_status(format!(
+                                    "{} Lv.{} \u{2014} {}",
+                                    def.name, new_level, flavor
+                                ));
+                            }
+                            Err(e) => {
+                                app.set_status(e);
+                            }
+                        }
+                    }
+                    KeyAction::Continue
+                }
+                _ => KeyAction::Continue,
+            }
+        }
+        Screen::Research | Screen::Combat | Screen::Leaderboard => {
             match code {
                 KeyCode::Esc => {
                     app.screen = Screen::Dashboard;
