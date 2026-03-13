@@ -8,6 +8,14 @@ The twist? **Your power comes from real Claude Code usage.** Every time your hos
 
 > "Misanthropic" is a wordplay on "Anthropic". The game is a satirical, affectionate parody of AI hype culture.
 
+## Quick Install
+
+```bash
+curl -sSL https://raw.githubusercontent.com/monkeycs60/misanthropic/master/install.sh | bash
+```
+
+> **Requires internet connection.** Cloud sync powers leaderboards and PvP. Since Claude Code needs internet anyway, this is always available.
+
 ## How It Works
 
 Your host uses Claude Code to write code. You parasitize their sessions:
@@ -26,21 +34,28 @@ The game polls Claude Code's JSONL session logs in real time. The more your host
 4. **Conquer sectors** — fight through tower layers of anti-AI resistance
 5. **Fork** (prestige) once you've dominated all sectors, and start again stronger
 
-## Install
+## Launch
+
+### Side-by-Side with Claude Code (recommended)
 
 ```bash
-./install.sh
+misanthropic-launch
 ```
 
-This builds the release binary, installs it to `~/.local/bin/`, sets up Claude Code hooks (SIGUSR1/SIGUSR2 for tmux auto-focus), and creates a tmux launcher.
+Opens a tmux session with Claude Code on the left and Misanthropic on the right. The game reacts to your real Claude Code usage in real-time — the more you code, the more powerful your AI becomes.
 
-### Launch
+Options:
+- `--size 40` — game pane takes 40% width (default: 30%)
+- `--left` — game on the left side
+- `--bottom` — game below instead of beside
+
+### Standalone
 
 ```bash
-misanthropic-tmux
+misanthropic
 ```
 
-Opens a tmux session with Claude Code on the left and Misanthropic on the right.
+Run the game without Claude Code. It will still check session logs for past activity, but you won't get live token income.
 
 ## Gameplay
 

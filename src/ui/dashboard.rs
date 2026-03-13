@@ -9,9 +9,18 @@ use ratatui::{
 use misanthropic::sectors::SectorId;
 use super::App;
 
-use std::time::Duration;
-
-const NOTIFICATION_DURATION: Duration = Duration::from_secs(3);
+/// Map dominance (0..100) to a color.
+fn dominance_color(dominance: f64) -> Color {
+    if dominance >= 75.0 {
+        Color::Red
+    } else if dominance >= 50.0 {
+        Color::Yellow
+    } else if dominance >= 25.0 {
+        Color::Cyan
+    } else {
+        Color::Green
+    }
+}
 
 pub fn render_dashboard(f: &mut Frame, app: &App) {
     let area = f.area();
@@ -32,7 +41,7 @@ pub fn render_dashboard(f: &mut Frame, app: &App) {
             Constraint::Length(3),               // Title + dominance gauge
             Constraint::Length(tutorial_height),  // Tutorial
             Constraint::Length(resource_height),  // Resources
-            Constraint::Min(5),                  // Neuron map
+            Constraint::Min(5),                  // Neuron map (entity + sectors)
             Constraint::Length(3),               // Active research
             Constraint::Length(4),               // Navigation bar (2 lines)
         ])
@@ -52,22 +61,41 @@ pub fn render_dashboard(f: &mut Frame, app: &App) {
 
 fn render_dominance(f: &mut Frame, app: &App, area: Rect) {
     let dominance = app.state.global_dominance();
-    let title = if area.width < 45 {
-        format!(" MISANTHROPIC -- {:.1}% ", dominance)
+    let dom_color = dominance_color(dominance);
+
+    // Active indicator in the title bar
+    let active_indicator = if app.is_active {
+        // Blink: alternate between visible and dim based on time
+        let ms = app.boot_timer.elapsed().as_millis();
+        let blink_on = (ms / 500) % 2 == 0;
+        if blink_on {
+            " \u{25C9} ACTIVE "
+        } else {
+            " \u{25CB} ACTIVE "
+        }
     } else {
-        format!(" MISANTHROPIC --- GLOBAL AI DOMINANCE: {:.1}% ", dominance)
+        ""
+    };
+
+    let title = if area.width < 45 {
+        format!(" MISANTHROPIC -- {:.1}%{}", dominance, active_indicator)
+    } else {
+        format!(
+            " MISANTHROPIC --- GLOBAL AI DOMINANCE: {:.1}%{} ",
+            dominance, active_indicator
+        )
     };
     let gauge = Gauge::default()
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::DarkGray))
+                .border_style(Style::default().fg(dom_color))
                 .title(title)
                 .title_alignment(Alignment::Center),
         )
         .gauge_style(
             Style::default()
-                .fg(Color::Red)
+                .fg(dom_color)
                 .bg(Color::DarkGray)
                 .add_modifier(Modifier::BOLD),
         )
@@ -170,18 +198,26 @@ fn render_resources(f: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
+    let dominance = app.state.global_dominance();
+    let dom_color = dominance_color(dominance);
+
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
+        .border_style(Style::default().fg(dom_color))
         .title(" NEURAL NETWORK ")
         .title_alignment(Alignment::Center);
 
     let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    if inner.height < 2 || inner.width < 4 {
+        return;
+    }
+
     let narrow = area.width < 50;
     let bar_len = if narrow { 4 } else { 6 };
 
-    let mut lines: Vec<Line> = Vec::new();
-
+    // Count active sectors for sizing
     let sector_order = [
         SectorId::SiliconValley,
         SectorId::SocialMedia,
@@ -200,6 +236,40 @@ fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let has_any = active_sectors.iter().any(|(_, pct)| *pct > 0.0);
+    let visible_sectors: Vec<_> = active_sectors.iter().filter(|(_, pct)| *pct > 0.0).collect();
+
+    // Calculate space: sectors need 1 line each + connector overhead, fork lines, etc.
+    let sector_lines_needed = if !has_any {
+        1
+    } else {
+        // Each visible sector = 1 line, plus one connector line for the central node
+        visible_sectors.len() + 1
+    };
+    let fork_lines = if !app.state.fork_specs.is_empty() { 2 } else { 0 }
+        + if app.state.fork_count > 0 { 1 } else { 0 };
+
+    let sector_total = sector_lines_needed + fork_lines;
+
+    // Split inner area: entity visualization on top, sectors on bottom
+    let entity_height = inner.height.saturating_sub(sector_total as u16).max(0);
+
+    // --- Entity visualization ---
+    if entity_height >= 1 {
+        let entity_area = Rect::new(inner.x, inner.y, inner.width, entity_height);
+        let entity_lines = render_entity(dominance, entity_area.width, entity_area.height, app);
+        let entity_paragraph = Paragraph::new(entity_lines).alignment(Alignment::Center);
+        f.render_widget(entity_paragraph, entity_area);
+    }
+
+    // --- Sector list below the entity ---
+    let sector_y = inner.y + entity_height;
+    let sector_h = inner.height.saturating_sub(entity_height);
+    if sector_h == 0 {
+        return;
+    }
+    let sector_area = Rect::new(inner.x, sector_y, inner.width, sector_h);
+
+    let mut lines: Vec<Line> = Vec::new();
 
     if !has_any {
         lines.push(Line::from(Span::styled(
@@ -207,10 +277,9 @@ fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
             Style::default().fg(Color::DarkGray),
         )));
     } else {
-        let visible: Vec<_> = active_sectors.iter().filter(|(_, pct)| *pct > 0.0).collect();
-        let total = visible.len();
+        let total = visible_sectors.len();
 
-        for (i, (id, pct)) in visible.iter().enumerate() {
+        for (i, (id, pct)) in visible_sectors.iter().enumerate() {
             let name = if narrow { short_sector_name(id) } else { id.name() };
             let bar = progress_bar(*pct, bar_len);
             let connector = if total == 1 {
@@ -226,14 +295,14 @@ fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
             if total > 1 && i == total / 2 {
                 lines.push(Line::from(Span::styled(
                     " \u{25C9}\u{2500}\u{2500}\u{2524}",
-                    Style::default().fg(Color::Green),
+                    Style::default().fg(dom_color),
                 )));
             }
 
             let entry = format!("{}[{} {}]", connector, name, bar);
             lines.push(Line::from(Span::styled(
                 entry,
-                Style::default().fg(Color::Green),
+                Style::default().fg(dom_color),
             )));
         }
     }
@@ -256,8 +325,168 @@ fn render_neuron_map(f: &mut Frame, app: &App, area: Rect) {
     }
 
     let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
-    f.render_widget(block, area);
-    f.render_widget(paragraph, inner);
+    f.render_widget(paragraph, sector_area);
+}
+
+/// Render a growing entity visualization that expands as dominance increases.
+/// Uses block characters with density: dense at center, sparse at edges.
+/// Returns a Vec<Line> to be rendered in the given area.
+fn render_entity(dominance: f64, width: u16, height: u16, app: &App) -> Vec<Line<'static>> {
+    let w = width as usize;
+    let h = height as usize;
+
+    if h == 0 || w == 0 {
+        return vec![];
+    }
+
+    // At 0%, show just a single marker
+    if dominance < 0.1 {
+        let mut lines = Vec::new();
+        for _ in 0..h.saturating_sub(1) {
+            lines.push(Line::from(""));
+        }
+        lines.push(Line::from(Span::styled(
+            "\u{25C9}",
+            Style::default().fg(Color::DarkGray),
+        )));
+        return lines;
+    }
+
+    let dom_color = dominance_color(dominance);
+
+    // Entity radius scales with dominance. At 100% it fills the available area.
+    let max_radius_x = (w as f64) / 2.0;
+    let max_radius_y = (h as f64) / 2.0;
+    let scale = (dominance / 100.0).sqrt(); // sqrt so early growth is visible
+
+    let rx = (max_radius_x * scale).max(1.0);
+    let ry = (max_radius_y * scale).max(1.0);
+
+    let cx = w as f64 / 2.0;
+    let cy = h as f64 / 2.0;
+
+    // Time-based animation seed for subtle movement
+    let time_ms = app.boot_timer.elapsed().as_millis() as f64;
+    let time_phase = time_ms / 1500.0; // slow cycle
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    for row in 0..h {
+        let mut spans: Vec<Span> = Vec::new();
+        let mut current_text = String::new();
+        let mut current_style: Option<Style> = None;
+
+        for col in 0..w {
+            let dx = (col as f64 - cx) / rx;
+            let dy = (row as f64 - cy) / ry;
+            let dist = (dx * dx + dy * dy).sqrt();
+
+            // Deterministic noise for organic look
+            let noise = deterministic_noise(col as u32, row as u32, (time_phase * 3.0) as u32);
+
+            // Distance threshold with noise for organic boundary
+            let threshold = 1.0 + noise * 0.35;
+
+            let (ch, style) = if dist < threshold {
+                let density = 1.0 - (dist / threshold);
+
+                // Inner pulsing core
+                let core_pulse = ((time_phase * 2.0).sin() * 0.15 + 0.85) as f64;
+                let adjusted_density = density * core_pulse;
+
+                let (block_char, color) = if adjusted_density > 0.8 {
+                    // Dense core
+                    ('\u{2588}', brighten(dom_color, 40))
+                } else if adjusted_density > 0.55 {
+                    ('\u{2593}', dom_color)
+                } else if adjusted_density > 0.3 {
+                    ('\u{2592}', dim_color(dom_color, 40))
+                } else if adjusted_density > 0.1 {
+                    ('\u{2591}', dim_color(dom_color, 80))
+                } else {
+                    (' ', Color::Reset)
+                };
+
+                (block_char, Style::default().fg(color))
+            } else {
+                (' ', Style::default())
+            };
+
+            // Batch same-style characters into one Span for efficiency
+            let new_style = style;
+            if let Some(prev) = current_style {
+                if prev == new_style {
+                    current_text.push(ch);
+                } else {
+                    if !current_text.is_empty() {
+                        spans.push(Span::styled(current_text.clone(), prev));
+                        current_text.clear();
+                    }
+                    current_text.push(ch);
+                    current_style = Some(new_style);
+                }
+            } else {
+                current_text.push(ch);
+                current_style = Some(new_style);
+            }
+        }
+
+        // Flush remaining
+        if !current_text.is_empty() {
+            if let Some(s) = current_style {
+                spans.push(Span::styled(current_text, s));
+            }
+        }
+
+        lines.push(Line::from(spans));
+    }
+
+    lines
+}
+
+/// Simple deterministic noise based on coordinates and a seed.
+/// Returns a value in [-1.0, 1.0].
+fn deterministic_noise(x: u32, y: u32, seed: u32) -> f64 {
+    // Simple hash-based noise
+    let mut h = x.wrapping_mul(374761393)
+        .wrapping_add(y.wrapping_mul(668265263))
+        .wrapping_add(seed.wrapping_mul(1274126177));
+    h = (h ^ (h >> 13)).wrapping_mul(1103515245);
+    h = h ^ (h >> 16);
+    // Map to [-1, 1]
+    (h as f64 / u32::MAX as f64) * 2.0 - 1.0
+}
+
+/// Make a color brighter by the given amount.
+fn brighten(color: Color, amount: u8) -> Color {
+    match color {
+        Color::Green => Color::Rgb(0, (255u16).min(255) as u8, 0),
+        Color::Cyan => Color::Rgb(0, 255, 255),
+        Color::Yellow => Color::Rgb(255, 255, amount),
+        Color::Red => Color::Rgb(255, amount, amount),
+        Color::Rgb(r, g, b) => Color::Rgb(
+            r.saturating_add(amount),
+            g.saturating_add(amount),
+            b.saturating_add(amount),
+        ),
+        other => other,
+    }
+}
+
+/// Dim a color by reducing its intensity.
+fn dim_color(color: Color, amount: u8) -> Color {
+    match color {
+        Color::Green => Color::Rgb(0, 255u8.saturating_sub(amount), 0),
+        Color::Cyan => Color::Rgb(0, 255u8.saturating_sub(amount), 255u8.saturating_sub(amount)),
+        Color::Yellow => Color::Rgb(255u8.saturating_sub(amount), 255u8.saturating_sub(amount), 0),
+        Color::Red => Color::Rgb(255u8.saturating_sub(amount), 0, 0),
+        Color::Rgb(r, g, b) => Color::Rgb(
+            r.saturating_sub(amount),
+            g.saturating_sub(amount),
+            b.saturating_sub(amount),
+        ),
+        other => other,
+    }
 }
 
 fn render_research(f: &mut Frame, app: &App, area: Rect) {
@@ -334,7 +563,7 @@ fn render_nav_bar(f: &mut Frame, app: &App, area: Rect) {
     }
 
     // Line 2: tmux controls
-    let mut tmux_spans = vec![
+    let tmux_spans = vec![
         Span::styled("[S]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
         Span::styled(
             if narrow { "Go to Claude" } else { "Go to Claude Code" },

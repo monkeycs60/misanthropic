@@ -77,6 +77,16 @@ fn main() -> io::Result<()> {
 
     // Register with backend
     let api = ApiClient::new(API_BASE_URL);
+
+    // Connectivity check — game requires internet
+    if let Err(e) = api.health_check() {
+        eprintln!("\x1b[31m✗ Cannot reach misanthropic servers.\x1b[0m");
+        eprintln!("  Internet connection required.");
+        eprintln!("  (Claude Code requires internet — so does your AI parasite.)");
+        eprintln!("  Error: {}", e);
+        std::process::exit(1);
+    }
+
     let player_name = state.player_name.clone().unwrap_or_else(|| "Anonymous".to_string());
     let _ = api.register(&state.player_id, &player_name);
 

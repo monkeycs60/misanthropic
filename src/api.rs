@@ -103,6 +103,19 @@ impl ApiClient {
         !self.base_url.is_empty()
     }
 
+    /// Check connectivity to the backend health endpoint.
+    pub fn health_check(&self) -> Result<(), String> {
+        if !self.is_online() {
+            return Ok(());
+        }
+        let url = format!("{}/health", self.base_url);
+        self.client
+            .get(&url)
+            .send()
+            .map_err(|e| format!("Network error: {}", e))?;
+        Ok(())
+    }
+
     /// Register a new player.
     /// POST /register
     pub fn register(&self, id: &str, name: &str) -> Result<(), String> {

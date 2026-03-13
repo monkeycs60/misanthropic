@@ -4,25 +4,37 @@ set -e
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+BOLD='\033[1m'
 NC='\033[0m'
+
+REPO_URL="https://github.com/monkeycs60/misanthropic.git"
+SRC_DIR="$HOME/.misanthropic/src"
+INSTALL_DIR="$HOME/.local/bin"
 
 echo -e "${YELLOW}╔══════════════════════════════════╗${NC}"
 echo -e "${YELLOW}║     misanthropic installer       ║${NC}"
 echo -e "${YELLOW}╚══════════════════════════════════╝${NC}"
 echo ""
 
-# --- Check dependencies ---
+# --- Install Rust if missing ---
 if ! command -v cargo &> /dev/null; then
-    echo -e "${RED}✗ Rust/Cargo not found${NC}"
-    echo "  Install from https://rustup.rs"
-    exit 1
+    echo -e "${YELLOW}⚠ Rust/Cargo not found — installing via rustup...${NC}"
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    # shellcheck source=/dev/null
+    source "$HOME/.cargo/env"
+    if ! command -v cargo &> /dev/null; then
+        echo -e "${RED}✗ Rust installation failed${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}✓${NC} Rust installed"
+else
+    echo -e "${GREEN}✓${NC} Rust/Cargo found"
 fi
-echo -e "${GREEN}✓${NC} Rust/Cargo found"
 
+# --- Install tmux if missing ---
 if ! command -v tmux &> /dev/null; then
     echo -e "${YELLOW}⚠ tmux not found (needed for side-by-side mode)${NC}"
     echo ""
-    # Detect package manager and install
     if command -v apt-get &> /dev/null; then
         echo "  Installing tmux via apt..."
         sudo apt-get install -y tmux && echo -e "${GREEN}✓${NC} tmux installed"
@@ -43,14 +55,29 @@ else
     echo -e "${GREEN}✓${NC} tmux found"
 fi
 
+# --- Clone or update repo ---
+echo ""
+mkdir -p "$HOME/.misanthropic"
+
+if [ -d "$SRC_DIR/.git" ]; then
+    echo "Updating misanthropic source..."
+    cd "$SRC_DIR"
+    git pull --ff-only 2>&1 || git pull 2>&1
+    echo -e "${GREEN}✓${NC} Source updated"
+else
+    echo "Cloning misanthropic..."
+    rm -rf "$SRC_DIR"
+    git clone "$REPO_URL" "$SRC_DIR" 2>&1
+    echo -e "${GREEN}✓${NC} Source cloned to $SRC_DIR"
+fi
+
 # --- Build ---
 echo ""
 echo "Building misanthropic (release)..."
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
+cd "$SRC_DIR"
 cargo build --release 2>&1
 
-BINARY="$SCRIPT_DIR/target/release/misanthropic"
+BINARY="$SRC_DIR/target/release/misanthropic"
 if [ ! -f "$BINARY" ]; then
     echo -e "${RED}✗ Build failed${NC}"
     exit 1
@@ -58,15 +85,10 @@ fi
 echo -e "${GREEN}✓${NC} Build successful"
 
 # --- Install binary ---
-INSTALL_DIR="$HOME/.local/bin"
 mkdir -p "$INSTALL_DIR"
 cp "$BINARY" "$INSTALL_DIR/misanthropic"
 chmod +x "$INSTALL_DIR/misanthropic"
 echo -e "${GREEN}✓${NC} Binary installed to $INSTALL_DIR/misanthropic"
-
-# --- Create ~/.misanthropic/ directory ---
-mkdir -p "$HOME/.misanthropic"
-echo -e "${GREEN}✓${NC} Created ~/.misanthropic/"
 
 # --- Create misanthropic-launch launcher ---
 cat > "$INSTALL_DIR/misanthropic-launch" << 'LAUNCHER'
@@ -218,14 +240,15 @@ echo -e "${GREEN} Installation complete!${NC}"
 echo -e "${GREEN}══════════════════════════════════════${NC}"
 echo ""
 echo "Usage:"
-echo "  misanthropic-launch  Launch Claude Code + Misanthropic side by side"
-echo "  misanthropic         Launch just the game standalone"
+echo -e "  ${BOLD}misanthropic-launch${NC}  Launch Claude Code + Misanthropic side by side"
+echo -e "  ${BOLD}misanthropic${NC}         Launch just the game standalone"
 echo ""
 echo "Controls:"
 echo "  B    Build/upgrade buildings"
 echo "  R    Research"
 echo "  C    Combat"
 echo "  L    Leaderboard"
+echo "  S    Switch to Claude Code pane"
 echo "  Q    Quit"
 echo ""
 echo "The game reacts to your Claude Code usage!"
